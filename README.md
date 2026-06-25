@@ -37,6 +37,39 @@ CLAUDE_MODE=import ./install.sh claude
 #   ...
 ```
 
+## 已有 AGENTS / CLAUDE 等配置的机器
+
+如果机器上 `~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md` 已是真实文件(非软链),`install.sh` 会先把旧文件**备份**成 `*.bak.<时间戳>` 再接入,不会直接丢内容。接入前请判断旧内容怎么办:
+
+1. **旧内容已被仓库覆盖** → 直接 `./install.sh`,旧文件留作 `.bak` 备份即可。
+2. **旧内容有仓库没有、且想全机器共享的规则** → 先把这部分并入仓库的 `AGENTS.md` 并提交,再 `./install.sh`。
+3. **旧内容是本机/本工具专属(带特定 wrapper、外部服务、机器环境细节)** → 放到本机专属补充(见下),不进仓库,接入时自动叠加。
+
+判断旧内容与仓库源的差异:
+
+```bash
+diff <(sort -u ~/.codex/AGENTS.md) <(sort -u ~/WorkSpace/agent-rules/AGENTS.md)
+grep '^#' ~/.codex/AGENTS.md   # 看旧文件有哪些小节
+```
+
+## 本机专属补充
+
+不进仓库、只在某台机器生效的规则,放到 `~/.agent-rules-local/<工具>.md`:
+
+| 文件 | 叠加到 |
+|------|--------|
+| `~/.agent-rules-local/codex.md` | Codex |
+| `~/.agent-rules-local/claude.md` | Claude Code |
+| `~/.agent-rules-local/gemini.md` | Gemini CLI |
+
+`install.sh` 检测到专属文件时自动叠加:
+
+- **支持 import 的工具(Claude)**:用 `@import` 引入仓库源和专属文件,`git pull` 后自动同步。
+- **不支持 import 的工具(Codex / Gemini)**:生成「仓库源 + 专属」的拼接文件;仓库源更新后**重跑 `./install.sh`** 重新拼接。
+
+适合放本机专属补充的内容:依赖特定 wrapper / 外部评审服务的调用纪律、某机器特有的路径或环境约定等——这些不该污染跨工具通用源。
+
+
 
 ## 文件
 
