@@ -30,6 +30,11 @@ fi
 # 备份已存在的真实文件 / 指向别处的软链;指向本仓库源的软链视为已就绪
 backup_if_needed() {
   local target="$1"
+  # 安全断言:绝不把仓库源自身当作写入目标,避免覆盖源
+  if [[ "$target" == "$SRC" || "$target" == "$REPO/"* ]]; then
+    echo "✗ 拒绝写入仓库内路径 $target(可能覆盖源文件);目标应在 \$HOME 下" >&2
+    exit 2
+  fi
   if [[ -L "$target" ]]; then
     [[ "$(readlink "$target")" == "$SRC" ]] && return 1
   fi
