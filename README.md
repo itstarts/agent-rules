@@ -9,6 +9,35 @@
 
 因此本仓库以 `AGENTS.md` 为**唯一真实源**,`CLAUDE.md` 用软链接指向它。改一处,两个工具同时生效,零重复、零漂移。
 
+> `AGENTS.md` 是 Linux Foundation 旗下 Agentic AI Foundation 主导的开放标准,被 Codex、Cursor、Copilot、Aider、Windsurf、Zed、Jules、Devin 等 20+ 工具原生读取。新增这类工具无需额外配置;只有"只认自家文件名"的工具(Claude Code → `CLAUDE.md`、Gemini CLI → `GEMINI.md`)才需软链桥接。
+
+## 新机器快速开始
+
+```bash
+# 1. clone(换成你的 GitHub 地址)
+git clone https://github.com/<你的用户名>/agent-rules.git ~/WorkSpace/agent-rules
+
+# 2. 一键安装全局规则(默认接 Codex + Claude Code)
+cd ~/WorkSpace/agent-rules
+./install.sh
+
+# 想同时接 Gemini CLI:
+./install.sh codex claude gemini
+```
+
+`install.sh` 幂等可重复运行:已正确指向本仓库的配置自动跳过,已存在的真实配置会先备份成 `*.bak.<时间戳>` 再建软链,不会丢内容。之后 `git pull` 更新 `AGENTS.md`,所有工具自动同步。
+
+若希望 Claude Code 在共享规则之外保留专属补充,用 import 模式安装:
+
+```bash
+CLAUDE_MODE=import ./install.sh claude
+# 生成的 ~/.claude/CLAUDE.md 形如:
+#   @~/WorkSpace/agent-rules/AGENTS.md
+#   ## Claude 专属补充
+#   ...
+```
+
+
 ## 文件
 
 | 文件 | 用途 |
@@ -16,11 +45,11 @@
 | `AGENTS.md` | 全局通用工程纪律(唯一源,去技术栈耦合,适合所有项目) |
 | `CLAUDE.md` | 软链接 → `AGENTS.md`,供 Claude Code 读取 |
 | `project-template.md` | 项目级规范模板,承载 SQL/DB、MQ、资金/权限/脱敏等栈相关与业务强约束 |
+| `install.sh` | 新机器一键安装脚本(建全局软链,幂等、自动备份) |
 
-## 安装:全局生效(机器上所有项目)
+## 手动安装:全局生效(install.sh 的等价操作)
 
-> 会让 Codex 与 Claude Code 在每个会话都加载本仓库的全局规则。
-> 下面假设仓库克隆在 `~/WorkSpace/agent-rules`,按实际路径替换。
+> 通常直接用上面的 `install.sh` 即可。下面是脚本背后做的事,供手动操作或排查参考。
 
 ```bash
 REPO=~/WorkSpace/agent-rules
