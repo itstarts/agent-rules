@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SRC="$REPO/AGENTS.md"
 CLAUDE_MODE="${CLAUDE_MODE:-symlink}"
 LOCAL_DIR="${AGENT_RULES_LOCAL:-$HOME/.agent-rules-local}"
@@ -27,14 +27,34 @@ if [[ ! -f "$SRC" ]]; then
   exit 1
 fi
 
-# 备份已存在的真实文件 / 指向别处的软链;指向本仓库源的软链视为已就绪
-backup_if_needed() {
-  local target="$1"
-  # 安全断言:绝不把仓库源自身当作写入目标,避免覆盖源
-  if [[ "$target" == "$SRC" || "$target" == "$REPO/"* ]]; then
-    echo "✗ 拒绝写入仓库内路径 $target(可能覆盖源文件);目标应在 \$HOME 下" >&2
+# 把路径规范化成"父目录解析软链后 + 文件名"的真实绝对路径(目标文件本身可不存在)。
+# 调用前提:调用方应已对目标父目录执行 mkdir -p(本脚本所有写入路径均如此),
+# 以保证父目录存在、能被解析;父目录不存在时退回原样返回,此时上层 assert 已无意义,
+# 故新增写入路径时务必保持"先 mkdir -p 再 assert/写入"的顺序。
+canonicalize() {
+  local p="$1" dir base
+  dir="$(dirname "$p")"; base="$(basename "$p")"
+  # 父目录必须存在才能解析;调用方已先 mkdir -p,这里兜底:不存在则原样返回
+  if [[ -d "$dir" ]]; then
+    printf '%s/%s\n' "$(cd "$dir" && pwd -P)" "$base"
+  else
+    printf '%s\n' "$p"
+  fi
+}
+
+# 安全断言:绝不把仓库内路径当作写入目标(规范化后比较,防 ../ 或软链父目录绕过)
+assert_outside_repo() {
+  local target; target="$(canonicalize "$1")"
+  if [[ "$target" == "$SRC" || "$target" == "$REPO" || "$target" == "$REPO/"* ]]; then
+    echo "✗ 拒绝写入仓库内路径 $1(规范化为 $target,可能覆盖源文件);目标应在 \$HOME 下" >&2
     exit 2
   fi
+}
+
+# 备份已存在的真实文件 / 指向别处的软链;指向本仓库源的软链视为已就绪(仅供纯软链模式判断跳过用)
+backup_if_needed() {
+  local target="$1"
+  assert_outside_repo "$target"
   if [[ -L "$target" ]]; then
     [[ "$(readlink "$target")" == "$SRC" ]] && return 1
   fi
@@ -44,6 +64,22 @@ backup_if_needed() {
     echo "  备份原文件 → $bak"
   fi
   return 0
+}
+
+# 为"写入真实文件内容"准备目标:任何已存在的 symlink 都先移除(避免写入顺链接覆盖源),
+# 真实文件则备份。保证随后的 `> target` 写的是全新普通文件。
+prepare_write_target() {
+  local target="$1"
+  assert_outside_repo "$target"
+  if [[ -L "$target" ]]; then
+    # 软链(无论指向哪里)一律删除,绝不顺链接写入
+    rm -f "$target"
+    echo "  移除原软链 $target"
+  elif [[ -e "$target" ]]; then
+    local bak="$target.bak.$(date +%Y%m%d%H%M%S)"
+    mv "$target" "$bak"
+    echo "  备份原文件 → $bak"
+  fi
 }
 
 # 返回某工具的本机专属补充文件路径(存在则回显,否则空)
@@ -69,7 +105,7 @@ link_to_src() {
 concat_with_extra() {
   local target="$1" extra="$2"
   mkdir -p "$(dirname "$target")"
-  backup_if_needed "$target" || true
+  prepare_write_target "$target"
   {
     echo "<!-- 自动生成:仓库源 + 本机专属。勿手改;改源请改 $SRC,改专属请改 $extra,然后重跑 install.sh -->"
     echo
@@ -101,7 +137,7 @@ install_claude() {
   # 有本机专属时强制走 import(软链无法叠加)
   if [[ "$CLAUDE_MODE" == "import" || -n "$extra" ]]; then
     mkdir -p "$(dirname "$target")"
-    backup_if_needed "$target" || true
+    prepare_write_target "$target"
     {
       echo "@$SRC"
       echo

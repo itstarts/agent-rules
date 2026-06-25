@@ -1,51 +1,42 @@
 # agent-rules
 
-跨 AI 编码工具共用的工程规则仓库。一份源,Codex 和 Claude Code 都能用。
+跨 AI 编码工具共用的工程规则仓库。一份源,Codex、Claude Code、Cursor、Copilot 等都能用,改一处全部生效。
 
-## 为什么这样组织
+## 文件
 
-- **Codex CLI** 自动读取 `AGENTS.md`,但不支持 `@import` 导入语法(纯文本拼接)。
-- **Claude Code** 只读取 `CLAUDE.md`(不原生读 `AGENTS.md`),但支持 `@import`(相对/绝对/`~` 路径,递归最多 4 层)。
+| 文件 | 用途 |
+|------|------|
+| `AGENTS.md` | **唯一真实源**:全局通用工程纪律,去技术栈耦合,适合所有项目 |
+| `CLAUDE.md` | 软链 → `AGENTS.md`,供 Claude Code 读取 |
+| `project-template.md` | 项目级规范模板,承载 SQL/DB、MQ、资金/权限/脱敏等栈相关与业务强约束 |
+| `install.sh` | 安装脚本:建全局软链 / 拼接,幂等、自动备份、支持本机专属补充 |
 
-因此本仓库以 `AGENTS.md` 为**唯一真实源**,`CLAUDE.md` 用软链接指向它。改一处,两个工具同时生效,零重复、零漂移。
-
-> `AGENTS.md` 是 Linux Foundation 旗下 Agentic AI Foundation 主导的开放标准,被 Codex、Cursor、Copilot、Aider、Windsurf、Zed、Jules、Devin 等 20+ 工具原生读取。新增这类工具无需额外配置;只有"只认自家文件名"的工具(Claude Code → `CLAUDE.md`、Gemini CLI → `GEMINI.md`)才需软链桥接。
-
-## 新机器快速开始
+## 快速开始(全局生效)
 
 ```bash
-# 1. clone(换成你的 GitHub 地址)
-git clone https://github.com/<你的用户名>/agent-rules.git ~/WorkSpace/agent-rules
-
-# 2. 一键安装全局规则(默认接 Codex + Claude Code)
+git clone git@github.com:itstarts/agent-rules.git ~/WorkSpace/agent-rules
 cd ~/WorkSpace/agent-rules
-./install.sh
-
-# 想同时接 Gemini CLI:
-./install.sh codex claude gemini
+./install.sh                      # 默认接 Codex + Claude Code
+./install.sh codex claude gemini  # 也接 Gemini CLI
 ```
 
-`install.sh` 幂等可重复运行:已正确指向本仓库的配置自动跳过,已存在的真实配置会先备份成 `*.bak.<时间戳>` 再建软链,不会丢内容。之后 `git pull` 更新 `AGENTS.md`,所有工具自动同步。
+装完后,各工具如何随仓库更新同步:
 
-若希望 Claude Code 在共享规则之外保留专属补充,用 import 模式安装:
+- **纯软链**(无本机专属补充的 Codex/Gemini,以及软链模式的 Claude):直接链到仓库 `AGENTS.md`,`git pull` 后自动生效。
+- **Claude import 文件**(有专属补充或 `CLAUDE_MODE=import`):import 是动态读取被引用文件,`git pull` 更新源后**自动生效**,无需重跑。
+- **拼接文件**(有专属补充的 Codex/Gemini,因这类工具不支持 import,只能把内容拼死):`git pull` 后需**重跑 `./install.sh`** 重新拼接。
 
-```bash
-CLAUDE_MODE=import ./install.sh claude
-# 生成的 ~/.claude/CLAUDE.md 形如:
-#   @~/WorkSpace/agent-rules/AGENTS.md
-#   ## Claude 专属补充
-#   ...
-```
+`install.sh` 可重复运行且安全:纯软链且已正确指向仓库时自动跳过;import / 拼接目标每次重跑都会重新生成(原真实文件先备份成 `*.bak.<时间戳>`,原软链先移除再写,绝不顺链接覆盖源)。
 
-## 已有 AGENTS / CLAUDE 等配置的机器
+## 已有 AGENTS / CLAUDE 配置的机器
 
-如果机器上 `~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md` 已是真实文件(非软链),`install.sh` 会先把旧文件**备份**成 `*.bak.<时间戳>` 再接入,不会直接丢内容。接入前请判断旧内容怎么办:
+若 `~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md`、`~/.gemini/GEMINI.md` 已是真实文件,`install.sh` 会先备份再接入。接入前先判断旧内容怎么办:
 
-1. **旧内容已被仓库覆盖** → 直接 `./install.sh`,旧文件留作 `.bak` 备份即可。
-2. **旧内容有仓库没有、且想全机器共享的规则** → 先把这部分并入仓库的 `AGENTS.md` 并提交,再 `./install.sh`。
-3. **旧内容是本机/本工具专属(带特定 wrapper、外部服务、机器环境细节)** → 放到本机专属补充(见下),不进仓库,接入时自动叠加。
+1. **旧内容已被仓库覆盖** → 直接 `./install.sh`,旧文件留作 `.bak`。
+2. **旧内容有仓库没有、想全机器共享的规则** → 先并入仓库 `AGENTS.md` 并提交,再 `./install.sh`。
+3. **旧内容是本机/本工具专属**(特定 wrapper、外部服务、机器环境细节) → 放本机专属补充(见下),不进仓库。
 
-判断旧内容与仓库源的差异:
+对比旧内容与仓库源的差异:
 
 ```bash
 diff <(sort -u ~/.codex/AGENTS.md) <(sort -u ~/WorkSpace/agent-rules/AGENTS.md)
@@ -54,78 +45,56 @@ grep '^#' ~/.codex/AGENTS.md   # 看旧文件有哪些小节
 
 ## 本机专属补充
 
-不进仓库、只在某台机器生效的规则,放到 `~/.agent-rules-local/<工具>.md`:
+不进仓库、只在某台机器生效的规则,放到 `~/.agent-rules-local/<工具>.md`(如 `codex.md` / `claude.md` / `gemini.md`;目录可用环境变量 `AGENT_RULES_LOCAL` 覆盖)。`install.sh` 检测到后自动叠加:
 
-| 文件 | 叠加到 |
-|------|--------|
-| `~/.agent-rules-local/codex.md` | Codex |
-| `~/.agent-rules-local/claude.md` | Claude Code |
-| `~/.agent-rules-local/gemini.md` | Gemini CLI |
-
-`install.sh` 检测到专属文件时自动叠加:
-
-- **支持 import 的工具(Claude)**:用 `@import` 引入仓库源和专属文件,`git pull` 后自动同步。
+- **支持 import 的工具(Claude)**:写入 import 文件,引入仓库源 + 专属文件,`git pull` 后自动同步。内容形如:
+  ```
+  @/Users/<你>/WorkSpace/agent-rules/AGENTS.md
+  @/Users/<你>/.agent-rules-local/claude.md
+  ```
+  (`@` 后是绝对路径;Claude 的 import 支持相对/绝对/`~` 路径,递归最多 4 层。)
 - **不支持 import 的工具(Codex / Gemini)**:生成「仓库源 + 专属」的拼接文件;仓库源更新后**重跑 `./install.sh`** 重新拼接。
 
-适合放本机专属补充的内容:依赖特定 wrapper / 外部评审服务的调用纪律、某机器特有的路径或环境约定等——这些不该污染跨工具通用源。
+想给 Claude 加专属补充,推荐放 `~/.agent-rules-local/claude.md`(脚本会自动以 `@import` 引入,重跑不丢)。不要在生成的 `~/.claude/CLAUDE.md` 里手动追加段落——每次重跑 `install.sh` 都会重写该文件,手动内容会丢失。`CLAUDE_MODE=import ./install.sh claude` 仅用于在无专属补充时也强制走 import 模式。
 
+适合放这里的内容:依赖特定 wrapper / 外部评审服务的调用纪律、某机器特有的路径或环境约定——这些不该污染跨工具通用源。
 
+## 项目级生效(单个项目)
 
-## 文件
-
-| 文件 | 用途 |
-|------|------|
-| `AGENTS.md` | 全局通用工程纪律(唯一源,去技术栈耦合,适合所有项目) |
-| `CLAUDE.md` | 软链接 → `AGENTS.md`,供 Claude Code 读取 |
-| `project-template.md` | 项目级规范模板,承载 SQL/DB、MQ、资金/权限/脱敏等栈相关与业务强约束 |
-| `install.sh` | 新机器一键安装脚本(建全局软链,幂等、自动备份) |
-
-## 手动安装:全局生效(install.sh 的等价操作)
-
-> 通常直接用上面的 `install.sh` 即可。下面是脚本背后做的事,供手动操作或排查参考。
+把模板复制进项目根目录,按该项目技术栈裁剪:
 
 ```bash
-REPO=~/WorkSpace/agent-rules
-
-# Codex 全局(~/.codex/AGENTS.md):不支持 import,用软链直接指向源
-mkdir -p ~/.codex
-ln -sf "$REPO/AGENTS.md" ~/.codex/AGENTS.md
-
-# Claude Code 全局(~/.claude/CLAUDE.md):两种方式二选一
-# 方式 A —— 软链(与 Codex 完全一致,无 Claude 专属补充):
-mkdir -p ~/.claude
-ln -sf "$REPO/AGENTS.md" ~/.claude/CLAUDE.md
-
-# 方式 B —— import(想在全局规则之外追加 Claude 专属指令时用):
-#   把 ~/.claude/CLAUDE.md 写成:
-#     @~/WorkSpace/agent-rules/AGENTS.md
-#     ## Claude 专属补充
-#     ...
-```
-
-软链方式下,克隆仓库后无需复制内容;`git pull` 更新源文件即同步生效。
-
-> 注意:方式 A 会覆盖你现有的 `~/.claude/CLAUDE.md`。若已有内容想保留,先备份,或改用方式 B 的 import。
-
-## 安装:项目级生效(单个项目)
-
-把模板复制进项目根目录,按该项目实际技术栈裁剪:
-
-```bash
-REPO=~/WorkSpace/agent-rules
 cd /path/to/your-project
-
-cp "$REPO/project-template.md" ./AGENTS.md   # 供 Codex 读取,按项目裁剪
-ln -s AGENTS.md ./CLAUDE.md                  # 供 Claude Code 读取
+cp ~/WorkSpace/agent-rules/project-template.md ./AGENTS.md  # 供 Codex 等读取,按项目裁剪
+ln -s AGENTS.md ./CLAUDE.md                                 # 供 Claude Code 读取
 ```
 
-项目级规则会与全局规则叠加;`AGENTS.md` 头部已说明优先级:用户指令 > 项目级 > 全局 > 系统默认。
+项目级规则与全局叠加。优先级(见 `AGENTS.md` 头部):用户指令 > 项目级 > 全局 > 系统默认。
 
-## 软链接与 Git
+## 工作原理
 
-- 软链接能被 git 跟踪(存储为链接本身),clone 后保留。
-- macOS / Linux 原生支持。Windows 需管理员权限或开发者模式,否则改用 import 方式。
+不同工具读不同文件名,且大多不能互换:
 
-## 维护
+- **`AGENTS.md`** 是 Linux Foundation 旗下 Agentic AI Foundation 主导的开放标准,被 Codex、Cursor、Copilot、Aider、Windsurf、Zed、Jules、Devin 等 20+ 工具**原生读取**。新增这类工具无需任何配置。
+- **Claude Code** 只读 `CLAUDE.md`(不读 `AGENTS.md`),但支持 `@import`(相对/绝对/`~` 路径,递归最多 4 层)。
+- **Gemini CLI** 读 `GEMINI.md`。
 
-只改 `AGENTS.md`(源)。`CLAUDE.md` 是软链,自动跟随。
+因此以 `AGENTS.md` 为唯一源,其余"只认自家文件名"的工具用软链或 import 桥接:能软链的软链(随 `git pull` 自动同步),需叠加本机专属的用拼接 / import。
+
+### 手动等价操作
+
+通常用 `install.sh` 即可。下面是脚本背后做的事,供排查参考:
+
+```bash
+REPO=~/WorkSpace/agent-rules
+mkdir -p ~/.codex ~/.claude                    # install.sh 会自动建,手动操作需自己建
+ln -sf "$REPO/AGENTS.md" ~/.codex/AGENTS.md    # Codex(无专属补充时)
+ln -sf "$REPO/AGENTS.md" ~/.claude/CLAUDE.md   # Claude(软链方式)
+# 或 Claude import 方式:把 ~/.claude/CLAUDE.md 写成 `@<REPO 绝对路径>/AGENTS.md` 再追加专属段落
+```
+
+## 维护与注意事项
+
+- 只改 `AGENTS.md`(源);`CLAUDE.md` 是软链,自动跟随。
+- 软链能被 git 跟踪(存为链接本身),clone 后保留。
+- **Windows** clone 还原软链需管理员权限或开发者模式,否则软链会变成普通文本文件 —— 此时改用 import 方式。
