@@ -95,6 +95,8 @@ ln -sf "$REPO/AGENTS.md" ~/.claude/CLAUDE.md   # Claude(软链方式)
 
 ## 维护与注意事项
 
-- 只改 `AGENTS.md`(源);`CLAUDE.md` 是软链,自动跟随。
+- 改全局规则只改 `AGENTS.md`(唯一源)。改完之后如何生效:
+  - **软链 / import 模式**(默认的 Claude,以及无本机专属补充的 Codex/Gemini):自动跟随,无需额外操作;跨机器 `git push` / `git pull` 即可。
+  - **拼接模式**(本机有专属补充的 Codex/Gemini):改完源或改完 `~/.agent-rules-local/<工具>.md` 后,需**重跑 `./install.sh <工具>`** 重新拼接。
 - 软链能被 git 跟踪(存为链接本身),clone 后保留。
 - **Windows** clone 还原软链需管理员权限或开发者模式,否则软链会变成普通文本文件 —— 此时改用 import 方式。
