@@ -1,6 +1,6 @@
 # agent-rules
 
-跨 AI 编码工具共用的工程规则仓库。一份源,Codex、Claude Code、Cursor、Copilot 等都能用,改一处全部生效。
+跨 AI 编码工具共用的工程规则:以 `AGENTS.md` 为唯一源,一处维护,Codex、Claude Code、Cursor、Copilot 等自动同步。
 
 ## 文件
 
