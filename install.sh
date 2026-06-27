@@ -22,6 +22,11 @@ SRC="$REPO/AGENTS.md"
 CLAUDE_MODE="${CLAUDE_MODE:-symlink}"
 LOCAL_DIR="${AGENT_RULES_LOCAL:-$HOME/.agent-rules-local}"
 
+if [[ "$CLAUDE_MODE" != "symlink" && "$CLAUDE_MODE" != "import" ]]; then
+  echo "✗ 非法 CLAUDE_MODE=$CLAUDE_MODE(仅支持 symlink / import)" >&2
+  exit 2
+fi
+
 if [[ ! -f "$SRC" ]]; then
   echo "✗ 找不到源文件 $SRC,仓库是否完整?" >&2
   exit 1
@@ -59,7 +64,7 @@ backup_if_needed() {
     [[ "$(readlink "$target")" == "$SRC" ]] && return 1
   fi
   if [[ -e "$target" || -L "$target" ]]; then
-    local bak="$target.bak.$(date +%Y%m%d%H%M%S)"
+    local bak="$target.bak.$(date +%Y%m%d%H%M%S).$$"
     mv "$target" "$bak"
     echo "  备份原文件 → $bak"
   fi
@@ -76,7 +81,7 @@ prepare_write_target() {
     rm -f "$target"
     echo "  移除原软链 $target"
   elif [[ -e "$target" ]]; then
-    local bak="$target.bak.$(date +%Y%m%d%H%M%S)"
+    local bak="$target.bak.$(date +%Y%m%d%H%M%S).$$"
     mv "$target" "$bak"
     echo "  备份原文件 → $bak"
   fi
@@ -156,15 +161,20 @@ echo "源:$SRC"
 echo "本机专属目录:$LOCAL_DIR$([[ -d "$LOCAL_DIR" ]] || echo '(不存在,无专属补充)')"
 echo "接入工具:${TOOLS[*]}"
 echo
+unknown=0
 for t in "${TOOLS[@]}"; do
   case "$t" in
     codex)  install_codex ;;
     claude) install_claude ;;
     gemini) install_gemini ;;
-    *) echo "未知工具:$t(支持 codex / claude / gemini)" >&2 ;;
+    *) echo "未知工具:$t(支持 codex / claude / gemini)" >&2; unknown=1 ;;
   esac
 done
 echo
+if [[ "$unknown" -ne 0 ]]; then
+  echo "✗ 存在未知工具名,未全部安装,请检查参数。" >&2
+  exit 2
+fi
 echo "✓ 完成。"
 echo "  - 纯软链 / import 的工具:git pull 更新仓库源后自动同步。"
 echo "  - 拼接生成的工具(含本机专属):git pull 后重跑 ./install.sh 重新拼接。"
