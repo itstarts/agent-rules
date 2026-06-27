@@ -1,5 +1,7 @@
 # agent-rules
 
+**简体中文** | [English](README.en.md)
+
 跨 AI 编码工具共用的工程规则:以 `AGENTS.md` 为唯一源,一处维护,Codex、Claude Code、Cursor、Copilot 等自动同步。
 
 ## 文件
@@ -31,7 +33,7 @@ cd ~/agent-rules
 - **Claude import 文件**(有专属补充或 `CLAUDE_MODE=import`):import 是动态读取被引用文件,`git pull` 更新源后**自动生效**,无需重跑。
 - **拼接文件**(有专属补充的 Codex/Gemini,因这类工具不支持 import,只能把内容拼死):`git pull` 后需**重跑 `./install.sh`** 重新拼接。
 
-`install.sh` 可重复运行且安全:纯软链且已正确指向仓库时自动跳过;import / 拼接目标每次重跑都会重新生成(原真实文件先备份成 `*.bak.<时间戳>`,原软链先移除再写,绝不顺链接覆盖源)。
+`install.sh` 可重复运行且安全:纯软链且已正确指向仓库时自动跳过;import / 拼接目标每次重跑都会重新生成(原真实文件先备份成 `*.bak.<时间戳>.<pid>`,原软链先移除再写,绝不顺链接覆盖源)。
 
 ## 已有 AGENTS / CLAUDE 配置的机器
 
