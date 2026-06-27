@@ -31,7 +31,9 @@ jobs:
           [ "$(readlink "$TMP/.claude/CLAUDE.md")" = "$PWD/AGENTS.md" ] || { echo "claude 软链未指向仓库源"; exit 1; }
 
           echo "== 2. 幂等重跑应跳过 =="
-          run codex claude | grep -q "已就绪" || { echo "幂等重跑未识别已就绪"; exit 1; }
+          out2="$(run codex claude)"
+          echo "$out2"
+          case "$out2" in *已就绪*) ;; *) echo "幂等重跑未识别已就绪"; exit 1;; esac
 
           echo "== 3. 未知工具名应非零退出 =="
           if HOME="$TMP" ./install.sh bogus-tool; then echo "未知工具名未触发非零退出"; exit 1; fi
