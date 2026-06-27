@@ -13,7 +13,7 @@
 
 ## 快速开始(全局生效)
 
-> 适用平台:macOS / Linux(依赖 Bash 与 `ln -s`)。Windows 需开发者模式或管理员权限还原软链,否则改用 import 模式(见下)。
+> 适用平台:macOS / Linux(依赖 Bash 与 `ln -s`)。Windows 上 Claude 可用 import 模式;Codex / Gemini 走软链或拼接,需开发者模式 / 管理员权限还原软链,或参照「手动等价操作」自行处理。
 > 这是一份**可直接用、也鼓励 fork 后按自己团队改写**的规则集——`AGENTS.md` 含明确的主观取向(如默认中文沟通、特定任务分级体系),照搬前请确认是否符合你的习惯。
 
 ```bash
@@ -23,7 +23,7 @@ cd ~/agent-rules
 ./install.sh codex claude gemini  # 也接 Gemini CLI
 ```
 
-> **clone 目录请固定保留,不要移动或删除**:软链与 Claude import 都按绝对路径指向该目录,目录一旦移走,各工具的全局配置会立即失效。换位置请重新 clone 并重跑 `./install.sh`。
+> **软链 / Claude import 模式下,clone 目录请固定保留,不要移动或删除**:这两种模式按绝对路径指向该目录,目录一旦移走,对应工具的全局配置会立即失效;换位置请重新 clone 并重跑 `./install.sh`。(拼接模式已把内容写死到目标文件,不依赖 clone 目录,但仓库源更新后仍需重跑 `./install.sh` 重新拼接。)
 
 装完后,各工具如何随仓库更新同步:
 
@@ -100,7 +100,7 @@ ln -sf "$REPO/AGENTS.md" ~/.claude/CLAUDE.md   # Claude(软链方式)
 
 ## 卸载与恢复
 
-`install.sh` 不修改源仓库,只在 `~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md`、`~/.gemini/GEMINI.md` 三处建立软链 / 写入文件,且接入前会把原有真实文件备份成 `*.bak.<时间戳>.<pid>`。要还原:
+`install.sh` 不修改源仓库,只在 `~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md`、`~/.gemini/GEMINI.md` 三处建立软链 / 写入文件(并按需 `mkdir -p` 创建缺失的父目录),接入前会把原有真实文件备份成同目录下的 `*.bak.<时间戳>.<pid>`。要还原:
 
 ```bash
 # 1. 删除本工具建立的软链 / 生成文件(按你接入过的工具选)
@@ -120,3 +120,11 @@ mv ~/.codex/AGENTS.md.bak.<时间戳>.<pid> ~/.codex/AGENTS.md
   - **拼接模式**(本机有专属补充的 Codex/Gemini):改完源或改完 `~/.agent-rules-local/<工具>.md` 后,需**重跑 `./install.sh <工具>`** 重新拼接。
 - 软链能被 git 跟踪(存为链接本身),clone 后保留。
 - **Windows** clone 还原软链需管理员权限或开发者模式,否则软链会变成普通文本文件 —— 此时改用 import 方式。
+
+## 贡献
+
+欢迎 fork 改成自己的版本。也欢迎对**通用工程纪律**(去技术栈耦合的部分)提 Issue 或 PR;涉及个人 / 团队主观偏好的规则(沟通语言、任务分级口径等)请在自己的 fork 里调整,不强求并入上游。
+
+## License
+
+[MIT](LICENSE) © itstarts

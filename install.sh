@@ -64,7 +64,8 @@ backup_if_needed() {
     [[ "$(readlink "$target")" == "$SRC" ]] && return 1
   fi
   if [[ -e "$target" || -L "$target" ]]; then
-    local bak="$target.bak.$(date +%Y%m%d%H%M%S).$$"
+    local bak
+    bak="$target.bak.$(date +%Y%m%d%H%M%S).$$"
     mv "$target" "$bak"
     echo "  备份原文件 → $bak"
   fi
@@ -81,7 +82,8 @@ prepare_write_target() {
     rm -f "$target"
     echo "  移除原软链 $target"
   elif [[ -e "$target" ]]; then
-    local bak="$target.bak.$(date +%Y%m%d%H%M%S).$$"
+    local bak
+    bak="$target.bak.$(date +%Y%m%d%H%M%S).$$"
     mv "$target" "$bak"
     echo "  备份原文件 → $bak"
   fi
