@@ -6,7 +6,7 @@
 
 ## 接受的改动
 
-- 技术栈无关、跨项目通用的工程纪律。
+- 技术栈无关、跨项目通用的工程纪律，以及跨项目可复用且触发条件明确的领域规则。
 - `install.sh` 的安全性、可移植性和幂等性改进。
 - README、安装文档、项目模板和开源治理文档改进。
 - CI 或验证流程改进。
@@ -34,7 +34,7 @@ Contributions are welcome for general engineering rules, installer behavior, and
 
 ### Accepted Changes
 
-- Tech-stack-agnostic engineering discipline.
+- Tech-stack-agnostic, cross-project engineering discipline, plus cross-project domain rules with explicit activation criteria.
 - Safety, portability, and idempotency improvements for `install.sh`.
 - README, install docs, project templates, and open-source governance docs.
 - CI or verification workflow improvements.
