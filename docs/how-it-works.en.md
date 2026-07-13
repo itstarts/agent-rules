@@ -35,7 +35,7 @@ Symlink and import modes take effect after repository updates. Concatenated file
 
 ## Global Rules and Project-Level Rules
 
-Global rules are for cross-project, tech-stack-agnostic engineering discipline. Project-level rules carry business, stack, and high-risk-path constraints.
+Global rules are for cross-project engineering discipline that is tech-stack agnostic by default. Domain rules may also be global when they are broadly reusable and have explicit task, stack, and tool activation conditions. Project-level rules carry concrete business, stack, and high-risk-path constraints.
 
 Recommended project-level setup:
 
@@ -58,4 +58,4 @@ Project-level rules may refine workflows and constraints, but should not loosen 
 - Keep `AGENTS.md` as a single source to avoid drift across tool-specific files.
 - Make the installer conservative around existing config so real files are not overwritten silently.
 - Keep per-machine extras out of the repository so personal paths or external-service conventions do not leak into shared rules.
-- Keep global rules tech-stack agnostic; stack-specific content belongs in project-level `AGENTS.md`.
+- Keep global rules tech-stack agnostic by default. Add domain rules conditionally only when they are reusable across projects and have explicit activation criteria; concrete stack constraints still belong in project-level `AGENTS.md`.
