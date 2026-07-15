@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import subprocess
+import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -33,6 +34,15 @@ class RepositoryRoleValidationTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertEqual("11 managed Codex agents validated\n", result.stdout)
+
+    def test_repository_role_names_are_spawn_agent_compatible(self) -> None:
+        source = REPO / "codex" / "agents"
+        names = (source / "managed-agents.txt").read_text(encoding="utf-8").splitlines()
+
+        for name in names:
+            with self.subTest(name=name):
+                self.assertRegex(name, re.compile(r"^[a-z0-9_]+$"))
+                self.assertEqual(name, (source / f"{name}.toml").stem)
 
     def test_invalid_role_sources_are_rejected_without_echoing_instructions(self) -> None:
         source = REPO / "codex" / "agents"

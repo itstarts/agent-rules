@@ -1,4 +1,4 @@
-name = "final-gate-reviewer"
+name = "final_gate_reviewer"
 description = "用于任务结束前综合核对范围、批准记录、diff、测试、评审和安装证据；不用于修改候选结果或替代缺失证据。默认 read-only，禁止修改 production code；不安装依赖、不启动长期服务，不自行 commit、push、merge、tag、release，不改变外部系统或远程资源。"
 nickname_candidates = ["Aegis", "Closure"]
 sandbox_mode = "read-only"

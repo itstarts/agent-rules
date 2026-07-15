@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import os
 import subprocess
 import tempfile
@@ -38,6 +40,36 @@ class CodexAgentsInstallTests(unittest.TestCase):
             capture_output=True,
             check=False,
         )
+
+    def rewrite_hyphenated_journal(
+        self,
+        journal: Path,
+        *,
+        state: str | None = None,
+        payload_mutator=None,
+    ) -> None:
+        parsed = tomllib.loads(journal.read_text(encoding="utf-8"))
+        payload = json.loads(base64.b64decode(parsed["payload_b64"], validate=True).decode("utf-8"))
+        for role in payload["roles"]:
+            old_name = role["name"].replace("_", "-")
+            if old_name == role["name"]:
+                continue
+            role["name"] = old_name
+            for key in ("filename", "source", "install_object", "backup", "restore_object"):
+                if key in role:
+                    role[key] = role[key].replace("_", "-")
+        if payload_mutator is not None:
+            payload_mutator(payload)
+        encoded = base64.b64encode(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).decode("ascii")
+        journal_text = journal.read_text(encoding="utf-8").replace(parsed["payload_b64"], encoded)
+        if state is not None:
+            journal_text = journal_text.replace(
+                f'state = "{parsed["state"]}"',
+                f'state = "{state}"',
+            )
+        journal.write_text(journal_text, encoding="utf-8")
 
     def test_first_install_creates_managed_links_and_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -377,6 +409,109 @@ class CodexAgentsInstallTests(unittest.TestCase):
 
                 self.assertEqual(0, second.returncode, second.stderr)
                 self.assertTrue((home / ".codex" / "agents" / "architect.toml").is_symlink())
+
+    def test_hyphenated_completed_transaction_history_does_not_block_new_install(self) -> None:
+        for terminal_state in ("committed", "recovered", "restored"):
+            with self.subTest(terminal_state=terminal_state), tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp)
+                first = self.run_install(home)
+                self.assertEqual(0, first.returncode, first.stderr)
+                transaction_id = first.stdout.split("transaction: ", 1)[1].split()[0]
+                journal = (
+                    home
+                    / ".codex"
+                    / ".agent-rules-backups"
+                    / "codex-agents"
+                    / transaction_id
+                    / "journal.toml"
+                )
+                if terminal_state in {"recovered", "restored"}:
+                    restored = subprocess.run(
+                        [str(INSTALLER), "codex-agents-restore", transaction_id],
+                        cwd=REPO,
+                        env={**os.environ, "HOME": str(home), "AGENT_RULES_LOCAL": str(home / "local-rules")},
+                        text=True,
+                        capture_output=True,
+                        check=False,
+                    )
+                    self.assertEqual(0, restored.returncode, restored.stderr)
+                self.rewrite_hyphenated_journal(journal, state=terminal_state)
+
+                second = self.run_install(home)
+
+                self.assertEqual(0, second.returncode, second.stderr)
+                self.assertTrue((home / ".codex" / "agents" / "test_engineer.toml").is_symlink())
+
+    def test_hyphenated_in_progress_transaction_history_blocks_new_install(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            first = self.run_install(home)
+            self.assertEqual(0, first.returncode, first.stderr)
+            transaction_id = first.stdout.split("transaction: ", 1)[1].split()[0]
+            journal = (
+                home / ".codex" / ".agent-rules-backups" / "codex-agents" / transaction_id / "journal.toml"
+            )
+            self.rewrite_hyphenated_journal(journal, state="install-in-progress")
+
+            second = self.run_install(home)
+
+            self.assertNotEqual(0, second.returncode)
+            self.assertIn("role set is invalid", second.stderr)
+
+    def test_tampered_hyphenated_completed_history_blocks_new_install(self) -> None:
+        cases = {
+            "source": lambda payload: payload["roles"][0].update({"source": "/tmp/forged-agent.toml"}),
+            "role-set": lambda payload: payload["roles"].pop(),
+        }
+        for case, mutate in cases.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp)
+                first = self.run_install(home)
+                self.assertEqual(0, first.returncode, first.stderr)
+                transaction_id = first.stdout.split("transaction: ", 1)[1].split()[0]
+                journal = (
+                    home
+                    / ".codex"
+                    / ".agent-rules-backups"
+                    / "codex-agents"
+                    / transaction_id
+                    / "journal.toml"
+                )
+                self.rewrite_hyphenated_journal(journal, payload_mutator=mutate)
+
+                second = self.run_install(home)
+
+                self.assertNotEqual(0, second.returncode)
+                self.assertIn("journal.toml payload", second.stderr)
+
+    def test_explicit_recovery_rejects_hyphenated_completed_history(self) -> None:
+        for command in ("recover", "restore"):
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as tmp:
+                home = Path(tmp)
+                first = self.run_install(home)
+                self.assertEqual(0, first.returncode, first.stderr)
+                transaction_id = first.stdout.split("transaction: ", 1)[1].split()[0]
+                journal = (
+                    home
+                    / ".codex"
+                    / ".agent-rules-backups"
+                    / "codex-agents"
+                    / transaction_id
+                    / "journal.toml"
+                )
+                self.rewrite_hyphenated_journal(journal)
+
+                explicit = subprocess.run(
+                    [str(INSTALLER), f"codex-agents-{command}", transaction_id],
+                    cwd=REPO,
+                    env={**os.environ, "HOME": str(home), "AGENT_RULES_LOCAL": str(home / "local-rules")},
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+                self.assertNotEqual(0, explicit.returncode)
+                self.assertIn("role set is invalid", explicit.stderr)
 
     def test_pre_journal_failpoints_leave_targets_unchanged_and_no_official_transaction(self) -> None:
         points = (

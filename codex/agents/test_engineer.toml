@@ -1,4 +1,4 @@
-name = "test-engineer"
+name = "test_engineer"
 description = "用于主代理明确分配的测试策略、fixture、测试辅助工具和验证；不用于默认修改 production code，也不用于弱化测试制造通过。默认 workspace-write，仅在用户和主代理同时明确授权时最小修改 production code；不安装依赖、不启动长期服务，不自行 commit、push、merge、tag、release，不改变外部系统或远程资源。"
 nickname_candidates = ["Gauge", "Probe"]
 sandbox_mode = "workspace-write"

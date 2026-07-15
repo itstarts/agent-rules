@@ -1,4 +1,4 @@
-name = "worker-backend"
+name = "worker_backend"
 description = "用于主代理明确分配的后端实现和后端测试；不用于前端、部署、CI、发布或未批准的契约、数据、迁移、权限、事务及外部接口变更。默认 workspace-write，仅允许修改分配范围内的 production code；不安装依赖、不启动长期服务，不自行 commit、push、merge、tag、release，不改变外部系统或远程资源。"
 nickname_candidates = ["Forge", "Harbor"]
 sandbox_mode = "workspace-write"

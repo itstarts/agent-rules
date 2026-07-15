@@ -59,6 +59,8 @@ ln -s AGENTS.md ./CLAUDE.md
 
 `AGENTS.md` 是工程规则单源；`codex/agents/` 是 Codex custom agents 的独立单源。源码目录没有项目级 `.codex/agents` 的自动加载语义，只有显式运行 `./install.sh codex-agents` 后，个人 Codex 根目录才通过逐文件绝对软链加载角色。`managed-agents.txt` 防止安装器把目录中未知文件自动纳入管理。
 
+受管理角色的文件名与 TOML `name` 完全一致，并统一使用仅含小写字母、数字和下划线的名称，以便可直接作为 `spawn_agent` 的 agent name 使用。
+
 角色文件只包含 `name`、`description`、`developer_instructions`、`nickname_candidates` 和 `sandbox_mode`。分析与评审角色默认为 `read-only`；明确实现角色默认为 `workspace-write`。父会话实时权限仍会重新施加，因此角色文件表达可审计默认值和职责边界，不是不可绕过的权限边界。
 
 安装事务以 Codex 根目录本身的目录描述符 `root_fd` 获取非阻塞独占锁，不创建持久锁文件。锁内访问从 `root_fd` 逐级使用 no-follow 和 `dir_fd` 操作，并在关键写入前复核根目录设备号和 inode；即使根路径被替换，旧事务也不会写入替代目录。
