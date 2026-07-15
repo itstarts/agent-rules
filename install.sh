@@ -19,6 +19,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SRC="$REPO/AGENTS.md"
+CODEX_AGENTS_HELPER="$REPO/scripts/codex_agents.py"
 CLAUDE_MODE="${CLAUDE_MODE:-symlink}"
 LOCAL_DIR="${AGENT_RULES_LOCAL:-$HOME/.agent-rules-local}"
 
@@ -31,6 +32,41 @@ if [[ ! -f "$SRC" ]]; then
   echo "✗ 找不到源文件 $SRC,仓库是否完整?" >&2
   exit 1
 fi
+
+# 先验证完整参数，再执行任何目标，避免错误参数造成部分安装。
+TOOLS=("$@")
+[[ ${#TOOLS[@]} -eq 0 ]] && TOOLS=(codex claude)
+
+require_codex_agents_python() {
+  if ! python3 -c 'import sys, tomllib; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+    echo "✗ codex-agents 需要 Python 3.11+ 及标准库 tomllib" >&2
+    return 2
+  fi
+}
+
+if [[ "${TOOLS[0]}" == "codex-agents-recover" || "${TOOLS[0]}" == "codex-agents-restore" ]]; then
+  if [[ ${#TOOLS[@]} -ne 2 || ! "${TOOLS[1]}" =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}$ ]]; then
+    echo "✗ ${TOOLS[0]} 必须独占命令行并接收一个合法 transaction ID" >&2
+    exit 2
+  fi
+  action="${TOOLS[0]#codex-agents-}"
+  require_codex_agents_python
+  exec python3 "$CODEX_AGENTS_HELPER" "$action" "${TOOLS[1]}"
+fi
+
+for t in "${TOOLS[@]}"; do
+  case "$t" in
+    codex|claude|gemini|codex-agents) ;;
+    codex-agents-recover|codex-agents-restore)
+      echo "✗ $t 必须独占命令行并接收一个 transaction ID" >&2
+      exit 2
+      ;;
+    *)
+      echo "✗ 未知工具名:$t(支持 codex / claude / gemini / codex-agents)" >&2
+      exit 2
+      ;;
+  esac
+done
 
 # 把路径规范化成"父目录解析软链后 + 文件名"的真实绝对路径(目标文件本身可不存在)。
 # 调用前提:调用方应已对目标父目录执行 mkdir -p(本脚本所有写入路径均如此),
@@ -135,6 +171,7 @@ install_concat_tool() {
 
 install_codex()  { install_concat_tool codex  "$HOME/.codex/AGENTS.md"; }
 install_gemini() { install_concat_tool gemini "$HOME/.gemini/GEMINI.md"; }
+install_codex_agents() { require_codex_agents_python && python3 "$CODEX_AGENTS_HELPER" install; }
 
 # Claude 支持 import:symlink 模式或 import 模式
 install_claude() {
@@ -156,27 +193,19 @@ install_claude() {
   fi
 }
 
-TOOLS=("$@")
-[[ ${#TOOLS[@]} -eq 0 ]] && TOOLS=(codex claude)
-
 echo "源:$SRC"
 echo "本机专属目录:$LOCAL_DIR$([[ -d "$LOCAL_DIR" ]] || echo '(不存在,无专属补充)')"
 echo "接入工具:${TOOLS[*]}"
 echo
-unknown=0
 for t in "${TOOLS[@]}"; do
   case "$t" in
     codex)  install_codex ;;
     claude) install_claude ;;
     gemini) install_gemini ;;
-    *) echo "未知工具:$t(支持 codex / claude / gemini)" >&2; unknown=1 ;;
+    codex-agents) install_codex_agents ;;
   esac
 done
 echo
-if [[ "$unknown" -ne 0 ]]; then
-  echo "✗ 存在未知工具名,未全部安装,请检查参数。" >&2
-  exit 2
-fi
 echo "✓ 完成。"
 echo "  - 纯软链 / import 的工具:git pull 更新仓库源后自动同步。"
 echo "  - 拼接生成的工具(含本机专属):git pull 后重跑 ./install.sh 重新拼接。"

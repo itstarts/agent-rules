@@ -12,6 +12,8 @@ This repository treats `AGENTS.md` as the single rule source, then wires it into
 | `CLAUDE.md` | Repository symlink pointing at `AGENTS.md` |
 | `project-template.md` | Project-level rule template |
 | `install.sh` | Local installer |
+| `codex/agents/` | Versioned Codex custom-agent sources |
+| `codex/agents/managed-agents.txt` | The installer's only ownership index |
 
 ## Tool Filename Differences
 
@@ -53,9 +55,20 @@ Priority:
 
 Project-level rules may refine workflows and constraints, but should not loosen safety, permission, or verification-evidence requirements.
 
+## Codex Roles and Transaction Boundaries
+
+`AGENTS.md` is the engineering-rule source; `codex/agents/` is the separate source for Codex custom agents. The source directory intentionally avoids project-level `.codex/agents` auto-loading. Personal Codex loads the roles through per-file absolute symlinks only after the explicit `./install.sh codex-agents` command. `managed-agents.txt` prevents the installer from silently adopting unknown files in the directory.
+
+Role files contain only `name`, `description`, `developer_instructions`, `nickname_candidates`, and `sandbox_mode`. Analysis and review roles default to `read-only`; explicitly scoped implementation roles default to `workspace-write`. A parent session's live permission policy is reapplied, so role files express auditable defaults and responsibility boundaries rather than an unbypassable security boundary.
+
+The installation transaction takes a non-blocking exclusive lock on the Codex root directory descriptor itself, named `root_fd`, without creating a persistent lock file. All in-root access starts from `root_fd` and uses no-follow and `dir_fd` operations. The installer rechecks the root device and inode before critical writes, so replacing the root path cannot redirect an old transaction into the replacement directory.
+
+After backups are complete and `fsync` has made them durable, the transaction publishes a schema-versioned `journal.toml`, installs roles one by one, atomically replaces config, and persists progress. Recovery first journals deterministic object names plus input/output digests, then creates recovery objects and rechecks their identities before every rename. State moves from `install-in-progress` to `committed`; interrupted work moves through `recover-in-progress` to `recovered`, while reversal of a committed transaction moves through `restore-in-progress` to `restored`. Resume accepts only the transaction-created state or exact pre-transaction state; any third state stops to avoid overwriting concurrent changes.
+
 ## Design Tradeoffs
 
 - Keep `AGENTS.md` as a single source to avoid drift across tool-specific files.
 - Make the installer conservative around existing config so real files are not overwritten silently.
 - Keep per-machine extras out of the repository so personal paths or external-service conventions do not leak into shared rules.
 - Keep global rules tech-stack agnostic by default. Add domain rules conditionally only when they are reusable across projects and have explicit activation criteria; concrete stack constraints still belong in project-level `AGENTS.md`.
+- Keep security analysis, design, implementation, testing, and review proportional to the task's actual risk and explicit threat model. Without a concrete risk and failure consequence, do not add code, tests, or gates for theoretical attack surfaces.

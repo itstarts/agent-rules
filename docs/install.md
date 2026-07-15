@@ -32,6 +32,55 @@ CLAUDE_MODE=import ./install.sh claude
 
 软链和 import 按绝对路径引用当前 clone。安装后请保留 clone 目录，不要移动或删除；换位置时重新 clone 并重跑安装脚本。
 
+## Codex 全局自定义角色
+
+角色安装是显式入口，不包含在默认安装或 `codex` 目标中：
+
+```bash
+./install.sh codex-agents
+```
+
+该入口要求 Python 3.11+ 和标准库 `tomllib`，不会安装依赖。Codex 根目录默认是 `~/.codex`；设置 `CODEX_HOME` 时使用该目录，且显式目录必须已经存在。
+
+仓库的 `codex/agents/managed-agents.txt` 精确声明 11 个受管理角色。安装器在 Codex 根目录的 `agents/` 中创建逐文件绝对软链，不接管整个目录，也不修改未管理角色。仓库移动后绝对软链会失效；把仓库移动到新位置后重新运行 `./install.sh codex-agents` 并执行校验。
+
+安装器只管理：
+
+```toml
+[agents]
+max_threads = 4
+max_depth = 1
+interrupt_message = true
+```
+
+模型、Provider、认证、MCP、插件、`job_max_runtime_seconds`、角色子表及其它配置保持不动；显式 `multi_agent = false` 或不兼容结构会安全停止。配置不存在时以 `0600` 创建；现有配置通过 `tomllib` 完整解析，只补缺失兼容键，并从同一 Codex 根文件系统内的事务 staging 原子替换。
+
+每次发生实际变更都会输出 transaction ID，格式为 UTC 时间戳和随机后缀。角色旧文件、损坏软链元数据和配置备份保存在 Codex 根目录下的受保护事务目录；目录权限不宽于 `0700`，普通备份和 `journal.toml` 不宽于 `0600`。事务先持久化备份与 journal，再修改目标。
+
+默认或非交互冲突不会产生任何备份或安装变更。只有交互终端中输入“只备份”明确确认时，安装器才创建内容摘要命名的幂等冲突快照并停止；该路径不会安装角色或修改配置。
+
+异常终止留下的进行中事务会阻止新安装。按错误消息中的 transaction ID 执行：
+
+```bash
+./install.sh codex-agents-recover 20260715T120000Z-a1b2c3d4e5f6
+```
+
+成功安装后需要撤销该事务时执行：
+
+```bash
+./install.sh codex-agents-restore 20260715T120000Z-a1b2c3d4e5f6
+```
+
+`recover` 恢复异常中断事务，`restore` 撤销已提交事务；两者都使用同一目录锁和 journal 状态机，可在再次中断后幂等续跑。恢复只处理该事务的受管理角色和新增配置键，并保留安装后的无关合法配置变化。
+
+安装后验证仓库源码和本机目标：
+
+```bash
+python3 -B scripts/validate_codex_agents.py
+python3 -B scripts/validate_codex_agents.py --installed-root "${CODEX_HOME:-$HOME/.codex}"
+codex --strict-config doctor --json
+```
+
 ## 目标文件与既有配置
 
 | 工具 | 目标文件 |
