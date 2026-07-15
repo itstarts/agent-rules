@@ -12,6 +12,8 @@
 | `CLAUDE.md` | 仓库内软链，指向 `AGENTS.md` |
 | `project-template.md` | 项目级规则模板 |
 | `install.sh` | 本机接入脚本 |
+| `codex/agents/` | 版本化 Codex 自定义角色源码 |
+| `codex/agents/managed-agents.txt` | 安装器唯一接管范围 |
 
 ## 工具文件名差异
 
@@ -53,9 +55,20 @@ ln -s AGENTS.md ./CLAUDE.md
 
 项目级规则可以细化流程和约束，但不应放宽安全、权限和验证证据要求。
 
+## Codex 角色与事务边界
+
+`AGENTS.md` 是工程规则单源；`codex/agents/` 是 Codex custom agents 的独立单源。源码目录没有项目级 `.codex/agents` 的自动加载语义，只有显式运行 `./install.sh codex-agents` 后，个人 Codex 根目录才通过逐文件绝对软链加载角色。`managed-agents.txt` 防止安装器把目录中未知文件自动纳入管理。
+
+角色文件只包含 `name`、`description`、`developer_instructions`、`nickname_candidates` 和 `sandbox_mode`。分析与评审角色默认为 `read-only`；明确实现角色默认为 `workspace-write`。父会话实时权限仍会重新施加，因此角色文件表达可审计默认值和职责边界，不是不可绕过的权限边界。
+
+安装事务以 Codex 根目录本身的目录描述符 `root_fd` 获取非阻塞独占锁，不创建持久锁文件。锁内访问从 `root_fd` 逐级使用 no-follow 和 `dir_fd` 操作，并在关键写入前复核根目录设备号和 inode；即使根路径被替换，旧事务也不会写入替代目录。
+
+备份完成并 `fsync` 后，事务才发布 schema-versioned `journal.toml`，随后逐个安装角色、原子替换配置并持久化进度。恢复会先把确定性对象名和输入/输出摘要写入 journal，再创建恢复对象；每次 rename 前复核对象身份。状态从 `install-in-progress` 到 `committed`；异常事务经 `recover-in-progress` 到 `recovered`，成功事务撤销时经 `restore-in-progress` 到 `restored`。目标已经处于事务创建态或事务前态时可幂等续跑，出现第三种状态则停止，避免覆盖并发修改。
+
 ## 设计取舍
 
 - 保持 `AGENTS.md` 单源，避免多个工具文件内容漂移。
 - 安装脚本默认保守处理既有配置，避免无提示覆盖真实文件。
 - 本机专属补充不进仓库，避免把个人机器路径或外部服务约定污染到共享规则。
 - 全局规则默认保持技术栈无关；只有跨项目可复用且触发条件明确的领域规则可以条件化加入，具体栈约束仍放到项目级 `AGENTS.md`。
+- 安全分析、设计、实现、测试和评审按任务实际风险与明确威胁模型收缩到最小充分范围；没有具体风险和失败后果时，不为理论攻击面增加代码、测试或门禁。

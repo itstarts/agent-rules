@@ -14,6 +14,10 @@ jobs:
         run: bash -n install.sh
       - name: shellcheck
         run: shellcheck install.sh
+      - name: Codex custom agent 校验
+        run: python3 -B scripts/validate_codex_agents.py
+      - name: Python 测试
+        run: python3 -B -m unittest discover -s tests -p 'test_*.py'
 
   smoke:
     runs-on: ubuntu-latest

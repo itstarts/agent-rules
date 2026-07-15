@@ -1,0 +1,11 @@
+architect
+data-consistency-reviewer
+final-gate-reviewer
+product-analyst
+reviewer
+spec-plan-reviewer
+test-engineer
+ui-ux-designer
+visual-reviewer
+worker-backend
+worker-frontend

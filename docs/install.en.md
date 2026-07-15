@@ -32,6 +32,55 @@ Environment variables:
 
 Symlink and import modes reference the current clone by absolute path. Keep the clone directory in place after installing; if you move it, re-clone and re-run the installer.
 
+## Global Codex Custom Agents
+
+Agent installation is an explicit target. It is not part of the default install or the existing `codex` target:
+
+```bash
+./install.sh codex-agents
+```
+
+This target requires Python 3.11+ and the standard-library `tomllib`; it does not install dependencies. The Codex root defaults to `~/.codex`. When `CODEX_HOME` is set, that explicit directory is used and must already exist.
+
+`codex/agents/managed-agents.txt` declares the exact set of 11 managed roles. The installer creates one absolute symlink per role under the Codex root's `agents/` directory. It does not replace the directory or modify unmanaged roles. Moving the repository breaks those absolute links; after a move, re-run `./install.sh codex-agents` and validate the installation.
+
+The installer owns only these settings:
+
+```toml
+[agents]
+max_threads = 4
+max_depth = 1
+interrupt_message = true
+```
+
+Models, providers, authentication, MCP, plugins, `job_max_runtime_seconds`, role subtables, and all other configuration remain unmanaged. Explicit `multi_agent = false` or an incompatible structure stops safely. A missing config is created with mode `0600`; an existing config is parsed completely with `tomllib`, receives only compatible missing keys, and is atomically replaced from transaction staging on the same Codex-root filesystem.
+
+Every installation that changes state prints a transaction ID containing a UTC timestamp and random suffix. Previous role files, broken-symlink metadata, and config backups live in a protected transaction directory under the Codex root. Directories are no broader than `0700`; regular backups and `journal.toml` are no broader than `0600`. Backups and the journal are durable before the first target changes.
+
+Default and non-interactive conflicts create no backup and perform no installation. Only an interactive terminal where the user enters the exact backup-only confirmation creates one content-addressed, idempotent conflict snapshot and stops. That path never installs roles or modifies config.
+
+An interrupted in-progress transaction blocks new installs. Use the transaction ID from the error:
+
+```bash
+./install.sh codex-agents-recover 20260715T120000Z-a1b2c3d4e5f6
+```
+
+To undo a committed install transaction:
+
+```bash
+./install.sh codex-agents-restore 20260715T120000Z-a1b2c3d4e5f6
+```
+
+`recover` repairs an interrupted transaction; `restore` reverses a committed one. Both use the same directory lock and journal state machine and can resume idempotently after another interruption. Recovery changes only the transaction's managed role targets and newly added config keys, preserving unrelated valid config changes made after installation.
+
+Validate repository sources and installed targets after installation:
+
+```bash
+python3 -B scripts/validate_codex_agents.py
+python3 -B scripts/validate_codex_agents.py --installed-root "${CODEX_HOME:-$HOME/.codex}"
+codex --strict-config doctor --json
+```
+
 ## Target Files and Existing Config
 
 | Tool | Target file |
