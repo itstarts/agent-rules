@@ -671,8 +671,9 @@ class CodexAgentsRecoveryTests(unittest.TestCase):
             transaction_id = re.search(r"transaction: ([^\s]+)", installed.stdout).group(1)
             architect = home / ".codex" / "agents" / "architect.toml"
             target = os.readlink(architect)
-            architect.unlink()
-            architect.symlink_to(target)
+            replacement = architect.with_name("replacement-architect.toml")
+            replacement.symlink_to(target)
+            replacement.replace(architect)
 
             restored = self.run_command(home, "codex-agents-restore", transaction_id)
 

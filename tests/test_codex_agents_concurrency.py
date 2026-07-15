@@ -217,8 +217,9 @@ class CodexAgentsConcurrencyTests(unittest.TestCase):
             def recreate(point: str) -> None:
                 if point == "locked-preflight-complete":
                     target = os.readlink(architect)
-                    architect.unlink()
-                    architect.symlink_to(target)
+                    replacement = architect.with_name("replacement-architect.toml")
+                    replacement.symlink_to(target)
+                    replacement.replace(architect)
 
             try:
                 with self.assertRaisesRegex(codex_agents.InstallError, "changed after preflight"):
@@ -247,8 +248,9 @@ class CodexAgentsConcurrencyTests(unittest.TestCase):
                     transaction = next(path for path in namespace.iterdir() if not path.name.startswith("."))
                     target = transaction / "install-architect.toml"
                     link_text = os.readlink(target)
-                    target.unlink()
-                    target.symlink_to(link_text)
+                    replacement = transaction / "replacement-install-architect.toml"
+                    replacement.symlink_to(link_text)
+                    replacement.replace(target)
 
             try:
                 with self.assertRaisesRegex(codex_agents.InstallError, "role install object changed"):
@@ -408,8 +410,10 @@ class CodexAgentsConcurrencyTests(unittest.TestCase):
                     namespace = root / ".agent-rules-backups" / "codex-agents"
                     transaction = next(path for path in namespace.iterdir() if not path.name.startswith("."))
                     target = transaction / "agents-object"
+                    candidate = transaction / "replacement-agents-object"
+                    candidate.mkdir()
                     target.rmdir()
-                    target.mkdir()
+                    candidate.rename(target)
                     replacement = target
 
             try:
