@@ -59,6 +59,8 @@ Project-level rules may refine workflows and constraints, but should not loosen 
 
 `AGENTS.md` is the engineering-rule source; `codex/agents/` is the separate source for Codex custom agents. The source directory intentionally avoids project-level `.codex/agents` auto-loading. Personal Codex loads the roles through per-file absolute symlinks only after the explicit `./install.sh codex-agents` command. `managed-agents.txt` prevents the installer from silently adopting unknown files in the directory.
 
+Each managed role's filename exactly matches its TOML `name`, and managed names contain only lowercase letters, digits, and underscores so they can be passed directly as a `spawn_agent` agent name.
+
 Role files contain only `name`, `description`, `developer_instructions`, `nickname_candidates`, and `sandbox_mode`. Analysis and review roles default to `read-only`; explicitly scoped implementation roles default to `workspace-write`. A parent session's live permission policy is reapplied, so role files express auditable defaults and responsibility boundaries rather than an unbypassable security boundary.
 
 The installation transaction takes a non-blocking exclusive lock on the Codex root directory descriptor itself, named `root_fd`, without creating a persistent lock file. All in-root access starts from `root_fd` and uses no-follow and `dir_fd` operations. The installer rechecks the root device and inode before critical writes, so replacing the root path cannot redirect an old transaction into the replacement directory.

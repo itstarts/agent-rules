@@ -4,6 +4,7 @@
 > 日期：2026-07-15
 > 依据：已批准的 `docs/superpowers/specs/2026-07-15-versioned-codex-custom-agents-design.md`
 > 门禁：用户已批准规格和计划，实施门禁已打开；按本计划执行实现、验证、本机安装和实施后独立评审。
+> 后续兼容修订：9 个复合角色按用户要求改为下划线名称，并补充旧连字符已完成 journal 的只读兼容；进行中事务与恢复校验保持严格。
 
 ## 1. 目标与实施边界
 
@@ -38,16 +39,16 @@
 
 - `codex/agents/managed-agents.txt`
 - `codex/agents/architect.toml`
-- `codex/agents/data-consistency-reviewer.toml`
-- `codex/agents/final-gate-reviewer.toml`
-- `codex/agents/product-analyst.toml`
+- `codex/agents/data_consistency_reviewer.toml`
+- `codex/agents/final_gate_reviewer.toml`
+- `codex/agents/product_analyst.toml`
 - `codex/agents/reviewer.toml`
-- `codex/agents/spec-plan-reviewer.toml`
-- `codex/agents/test-engineer.toml`
-- `codex/agents/ui-ux-designer.toml`
-- `codex/agents/visual-reviewer.toml`
-- `codex/agents/worker-backend.toml`
-- `codex/agents/worker-frontend.toml`
+- `codex/agents/spec_plan_reviewer.toml`
+- `codex/agents/test_engineer.toml`
+- `codex/agents/ui_ux_designer.toml`
+- `codex/agents/visual_reviewer.toml`
+- `codex/agents/worker_backend.toml`
+- `codex/agents/worker_frontend.toml`
 - `scripts/codex_agents.py`
 - `scripts/validate_codex_agents.py`
 - `tests/test_codex_agent_roles.py`
@@ -524,17 +525,17 @@ allowed=(
   README.en.md
   README.md
   codex/agents/architect.toml
-  codex/agents/data-consistency-reviewer.toml
-  codex/agents/final-gate-reviewer.toml
+  codex/agents/data_consistency_reviewer.toml
+  codex/agents/final_gate_reviewer.toml
   codex/agents/managed-agents.txt
-  codex/agents/product-analyst.toml
+  codex/agents/product_analyst.toml
   codex/agents/reviewer.toml
-  codex/agents/spec-plan-reviewer.toml
-  codex/agents/test-engineer.toml
-  codex/agents/ui-ux-designer.toml
-  codex/agents/visual-reviewer.toml
-  codex/agents/worker-backend.toml
-  codex/agents/worker-frontend.toml
+  codex/agents/spec_plan_reviewer.toml
+  codex/agents/test_engineer.toml
+  codex/agents/ui_ux_designer.toml
+  codex/agents/visual_reviewer.toml
+  codex/agents/worker_backend.toml
+  codex/agents/worker_frontend.toml
   docs/how-it-works.en.md
   docs/how-it-works.md
   docs/install.en.md
@@ -676,11 +677,11 @@ multi_agent 仍有效
 
 - [x] **Step 11.2：一致性专项评审**
 
-由于实现包含锁、journal、崩溃恢复和共享状态，使用 `data-consistency-reviewer` 复核锁范围、持有时长、持久化顺序、状态机、幂等性和并发竞态。
+由于实现包含锁、journal、崩溃恢复和共享状态，使用 `data_consistency_reviewer` 复核锁范围、持有时长、持久化顺序、状态机、幂等性和并发竞态。
 
 - [x] **Step 11.3：规格与计划一致性评审**
 
-使用 `spec-plan-reviewer` 对批准规格、批准计划、最新 diff 和验证证据做只读核对。
+使用 `spec_plan_reviewer` 对批准规格、批准计划、最新 diff 和验证证据做只读核对。
 
 - [x] **Step 11.4：修复并复审至收敛**
 
@@ -688,7 +689,7 @@ multi_agent 仍有效
 
 - [x] **Step 11.5：最终全量门禁**
 
-使用 `final-gate-reviewer` 综合核对范围、批准记录、diff、测试、ShellCheck/CI 状态、本机安装、运行时冒烟、能力缺口和未解决项。只有结论为 `APPROVED` 才能报告实施完成。
+使用 `final_gate_reviewer` 综合核对范围、批准记录、diff、测试、ShellCheck/CI 状态、本机安装、运行时冒烟、能力缺口和未解决项。只有结论为 `APPROVED` 才能报告实施完成。
 
 ## 4. 计划阶段完成条件
 
@@ -819,19 +820,19 @@ implementation_gate: complete
 第七轮三个独立 read-only 评审均为 `APPROVED`，且 `findings: []`：
 
 - `reviewer`：确认全局最小必要安全规则、journal 临时文件处理、Python 前置检查和两项回归没有现实功能缺陷。
-- `data-consistency-reviewer`：确认合法 journal 临时文件崩溃可重试，未知 staging 项仍拒绝，未重新扩大已排除威胁模型。
-- `spec-plan-reviewer`：确认用户批准的范围收缩已同步到 `AGENTS.md`、规格、计划、32 路径 allowlist 和验证证据。
+- `data_consistency_reviewer`：确认合法 journal 临时文件崩溃可重试，未知 staging 项仍拒绝，未重新扩大已排除威胁模型。
+- `spec_plan_reviewer`：确认用户批准的范围收缩已同步到 `AGENTS.md`、规格、计划、32 路径 allowlist 和验证证据。
 
 三个会话均精确加载已安装角色 TOML，校验必填字段和声明 sandbox，有效 sandbox 为 read-only，独立上下文为 true，未执行 SHA-256，也未声称原生 named-agent。
 
 随后按最新代码执行真实 restore/reinstall 时暴露一个现实升级兼容问题：个人历史目录中存在 schema v1 的已完成 transaction，新安装扫描把它当作 schema 错误并永久阻断。该问题按测试先行最小修复：新安装扫描只忽略 schema v1 且状态为 `recovered`/`restored` 的历史记录；显式对旧事务执行 recover/restore 仍明确 `schema mismatch`，不猜测旧恢复语义。新增回归与既有旧 schema 拒绝回归同时通过，完整测试为 81 个；修复后真实 reinstall、11 个安装软链和受管理配置再次验证通过。
 
-第八轮针对该兼容修复的窄范围独立复审中，`reviewer` 与 `data-consistency-reviewer` 均为 `APPROVED`、`findings: []`。`spec-plan-reviewer` 提出两项范围内问题：规格仍把所有 schema 不匹配描述为无例外拒绝，以及普通安装扫描的正向回归只覆盖 `restored`。现已最小修订：规格明确该例外只适用于普通安装扫描中的 schema v1 已完成历史，显式恢复入口仍严格拒绝；原回归参数化覆盖 `recovered`/`restored` 两种状态。两项定向正反测试通过，完整 81 个测试再次通过。
+第八轮针对该兼容修复的窄范围独立复审中，`reviewer` 与 `data_consistency_reviewer` 均为 `APPROVED`、`findings: []`。`spec_plan_reviewer` 提出两项范围内问题：规格仍把所有 schema 不匹配描述为无例外拒绝，以及普通安装扫描的正向回归只覆盖 `restored`。现已最小修订：规格明确该例外只适用于普通安装扫描中的 schema v1 已完成历史，显式恢复入口仍严格拒绝；原回归参数化覆盖 `recovered`/`restored` 两种状态。两项定向正反测试通过，完整 81 个测试再次通过。
 
-`spec-plan-reviewer` 复审上述两项修订后为 `APPROVED`、`findings: []`、`verification_gaps: []`；角色配置、声明与有效 read-only sandbox、独立上下文均验证通过，未执行 SHA-256，未声称原生 named-agent。三类实施评审至此收敛，进入最终静态验证和 final gate。
+`spec_plan_reviewer` 复审上述两项修订后为 `APPROVED`、`findings: []`、`verification_gaps: []`；角色配置、声明与有效 read-only sandbox、独立上下文均验证通过，未执行 SHA-256，未声称原生 named-agent。三类实施评审至此收敛，进入最终静态验证和 final gate。
 
-最终静态验证再次通过：81 个测试、仓库与实际安装的 11 角色 validator、`bash -n`、9 个 Python 文件 AST、全局 `AGENTS.md` 软链、实际受管理配置、精确 32 路径 allowlist、tracked/staged/untracked whitespace、`project-template.md` 未修改及无 `__pycache__`。进入单次 `final-gate-reviewer` 门禁。
+最终静态验证再次通过：81 个测试、仓库与实际安装的 11 角色 validator、`bash -n`、9 个 Python 文件 AST、全局 `AGENTS.md` 软链、实际受管理配置、精确 32 路径 allowlist、tracked/staged/untracked whitespace、`project-template.md` 未修改及无 `__pycache__`。进入单次 `final_gate_reviewer` 门禁。
 
-单次 `final-gate-reviewer` 最终门禁为 `APPROVED`、`findings: []`。门禁确认交付严格限于 32 个允许路径；81 个测试、仓库与安装目标 validator、脚本与 AST、实际安装、配置、全局规则软链及独立评审证据均满足。非阻断缺口仅为本机未安装 ShellCheck（CI 已配置）以及平台无原生 named-agent 接口（已按用户批准采用独立 read-only 会话加载角色 TOML）。
+单次 `final_gate_reviewer` 最终门禁为 `APPROVED`、`findings: []`。门禁确认交付严格限于 32 个允许路径；81 个测试、仓库与安装目标 validator、脚本与 AST、实际安装、配置、全局规则软链及独立评审证据均满足。非阻断缺口仅为本机未安装 ShellCheck（CI 已配置）以及平台无原生 named-agent 接口（已按用户批准采用独立 read-only 会话加载角色 TOML）。
 
 最终门禁后，用户进一步要求全局安全规则不要过度思考、设计和开发。`AGENTS.md` 已将安全分析、设计、实现、测试和评审统一收缩到实际风险与明确威胁模型下的最小充分范围，并允许项目级规则据此细化或收缩流程；最低边界仍要求最小充分验证、不得绕过已有安全与权限机制、不得违反系统或平台约束。独立只读 Sub Agent 首轮指出项目级规则最低边界表述不足，修订后复审为 `APPROVED`、`findings: []`。

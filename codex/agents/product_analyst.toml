@@ -1,4 +1,4 @@
-name = "product-analyst"
+name = "product_analyst"
 description = "用于需求澄清、用户场景、验收标准、范围与非目标；不用于架构决策、实现或替用户发明业务规则。默认 read-only，禁止修改 production code；不安装依赖、不启动长期服务，不自行 commit、push、merge、tag、release，不改变外部系统或远程资源。"
 nickname_candidates = ["Insight", "Prism"]
 sandbox_mode = "read-only"

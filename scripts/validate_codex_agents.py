@@ -11,16 +11,16 @@ from typing import Any
 
 EXPECTED_SANDBOX = {
     "architect": "read-only",
-    "data-consistency-reviewer": "read-only",
-    "final-gate-reviewer": "read-only",
-    "product-analyst": "read-only",
+    "data_consistency_reviewer": "read-only",
+    "final_gate_reviewer": "read-only",
+    "product_analyst": "read-only",
     "reviewer": "read-only",
-    "spec-plan-reviewer": "read-only",
-    "test-engineer": "workspace-write",
-    "ui-ux-designer": "read-only",
-    "visual-reviewer": "read-only",
-    "worker-backend": "workspace-write",
-    "worker-frontend": "workspace-write",
+    "spec_plan_reviewer": "read-only",
+    "test_engineer": "workspace-write",
+    "ui_ux_designer": "read-only",
+    "visual_reviewer": "read-only",
+    "worker_backend": "workspace-write",
+    "worker_frontend": "workspace-write",
 }
 ALLOWED_FIELDS = {
     "name",
@@ -30,7 +30,7 @@ ALLOWED_FIELDS = {
     "sandbox_mode",
 }
 REQUIRED_FIELDS = {"name", "description", "developer_instructions"}
-NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+NAME_RE = re.compile(r"^[a-z0-9_]+$")
 NICKNAME_RE = re.compile(r"^[A-Za-z0-9 _-]+$")
 DESCRIPTION_MARKERS = (
     "用于",

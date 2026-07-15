@@ -42,6 +42,23 @@ ALL_JOURNAL_STATES = {
     "restore-in-progress",
     "restored",
 }
+LEGACY_MANAGED_ROLE_NAMES = tuple(
+    sorted(
+        {
+            "architect",
+            "data-consistency-reviewer",
+            "final-gate-reviewer",
+            "product-analyst",
+            "reviewer",
+            "spec-plan-reviewer",
+            "test-engineer",
+            "ui-ux-designer",
+            "visual-reviewer",
+            "worker-backend",
+            "worker-frontend",
+        }
+    )
+)
 
 
 @dataclass(frozen=True)
@@ -542,19 +559,77 @@ def _legacy_completed_state(transaction_fd: int, transaction_id: str) -> str | N
         return None
     try:
         parsed = tomllib.loads(_read_regular_at(transaction_fd, "journal.toml").decode("utf-8"))
-    except (UnicodeError, tomllib.TOMLDecodeError, InstallError):
+        payload = json.loads(base64.b64decode(parsed["payload_b64"], validate=True).decode("utf-8"))
+        root_path = base64.b64decode(parsed["root_path_b64"], validate=True).decode("utf-8")
+    except (
+        KeyError,
+        TypeError,
+        UnicodeError,
+        ValueError,
+        tomllib.TOMLDecodeError,
+        json.JSONDecodeError,
+        InstallError,
+    ):
         return None
     state = parsed.get("state")
+    schema = parsed.get("schema_version")
     if (
-        parsed.get("schema_version") == 1
+        schema == 1
         and parsed.get("transaction_id") == transaction_id
         and state in {"recovered", "restored"}
     ):
         return state
-    return None
+    names = (
+        [role.get("name") for role in payload.get("roles", []) if isinstance(role, dict)]
+        if isinstance(payload, dict)
+        else []
+    )
+    supported_history = (
+        schema == JOURNAL_SCHEMA_VERSION
+        and state in {"committed", "recovered", "restored"}
+        and names == list(LEGACY_MANAGED_ROLE_NAMES)
+    )
+    if not supported_history:
+        return None
+    if (
+        set(parsed)
+        != {
+            "schema_version",
+            "transaction_id",
+            "state",
+            "root_path_b64",
+            "root_identity",
+            "payload_b64",
+        }
+        or parsed.get("transaction_id") != transaction_id
+        or not isinstance(root_path, str)
+        or not root_path
+        or not isinstance(parsed.get("root_identity"), str)
+        or not re.fullmatch(r"[0-9]+:[0-9]+", parsed["root_identity"])
+    ):
+        return None
+    try:
+        _validate_journal_payload(
+            payload,
+            transaction_id,
+            state,
+            expected_names=names,
+            source_paths_must_exist=False,
+        )
+        _validate_journal_backups(transaction_fd, payload)
+    except InstallError:
+        return None
+    return state
 
 
-def _validate_journal_payload(payload: dict[str, Any], transaction_id: str, state: str) -> None:
+def _validate_journal_payload(
+    payload: dict[str, Any],
+    transaction_id: str,
+    state: str,
+    *,
+    expected_names: list[str] | None = None,
+    source_paths_must_exist: bool = True,
+) -> None:
     if not set(payload) <= {"agents", "roles", "config", "restore_plan_ready"}:
         raise InstallError("journal.toml payload fields are invalid")
     plan_ready = payload.get("restore_plan_ready")
@@ -589,7 +664,7 @@ def _validate_journal_payload(payload: dict[str, Any], transaction_id: str, stat
             raise InstallError("journal.toml payload agents object is invalid")
     if "applied" in agents_state and not isinstance(agents_state["applied"], bool):
         raise InstallError("journal.toml payload agents progress is invalid")
-    expected_names = sorted(validate_source_names())
+    expected_names = sorted(validate_source_names()) if expected_names is None else expected_names
     roles = payload.get("roles")
     if not isinstance(roles, list):
         raise InstallError("journal.toml payload is invalid")
@@ -622,7 +697,9 @@ def _validate_journal_payload(payload: dict[str, Any], transaction_id: str, stat
             raise InstallError("journal.toml payload role fields are invalid")
         if role.get("filename") != f"{name}.toml":
             raise InstallError("journal.toml payload role path is invalid")
-        expected_source = str((_source_dir() / f"{name}.toml").resolve(strict=True))
+        expected_source = str(
+            (_source_dir() / f"{name}.toml").resolve(strict=source_paths_must_exist)
+        )
         if role.get("source") != expected_source:
             raise InstallError("journal.toml payload role source is invalid")
         if before_kind not in {"missing", "ready", "regular", "symlink"}:
