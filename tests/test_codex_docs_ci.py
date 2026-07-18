@@ -58,6 +58,31 @@ class CodexDocsAndCiContractTests(unittest.TestCase):
                 for marker in required:
                     self.assertIn(marker, content)
 
+    def test_how_it_works_guides_cover_role_routing_and_effort_policy(self) -> None:
+        shared = (
+            "product_analyst",
+            "architect",
+            "spec_plan_reviewer",
+            "reviewer",
+            "data_consistency_reviewer",
+            "final_gate_reviewer",
+            "ui_ux_designer",
+            "visual_reviewer",
+            "worker_backend",
+            "worker_frontend",
+            "test_engineer",
+            "model_reasoning_effort",
+        )
+        for relative, heading in (
+            ("docs/how-it-works.md", "角色路由"),
+            ("docs/how-it-works.en.md", "Role Routing"),
+        ):
+            with self.subTest(relative=relative):
+                content = self.read(relative)
+                self.assertIn(heading, content)
+                for marker in shared:
+                    self.assertIn(marker, content)
+
 
 if __name__ == "__main__":
     unittest.main()

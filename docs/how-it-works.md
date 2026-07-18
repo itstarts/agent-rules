@@ -61,7 +61,31 @@ ln -s AGENTS.md ./CLAUDE.md
 
 受管理角色的文件名与 TOML `name` 完全一致，并统一使用仅含小写字母、数字和下划线的名称，以便可直接作为 `spawn_agent` 的 agent name 使用。
 
-角色文件只包含 `name`、`description`、`developer_instructions`、`nickname_candidates` 和 `sandbox_mode`。分析与评审角色默认为 `read-only`；明确实现角色默认为 `workspace-write`。父会话实时权限仍会重新施加，因此角色文件表达可审计默认值和职责边界，不是不可绕过的权限边界。
+角色文件包含 `name`、精简的路由 `description`、`developer_instructions`、`nickname_candidates`、`sandbox_mode`，以及可选的 `model_reasoning_effort`。分析与评审角色默认为 `read-only`；明确实现角色默认为 `workspace-write`。父会话实时权限仍会重新施加，因此角色文件表达可审计默认值和职责边界，不是不可绕过的权限边界。
+
+`product_analyst`、`ui_ux_designer` 和 `visual_reviewer` 是边界明确的轻量只读角色，固定 `model_reasoning_effort = "medium"` 以控制延迟和消耗。架构、实现、测试、代码评审、数据一致性和最终门禁角色不固定模型或 reasoning effort，继续继承父会话，以免降低复杂任务能力或绑定单一 Provider。
+
+## Codex 角色路由
+
+优先选择与当前产物和任务边界最匹配的一个角色：
+
+| 当前任务或产物 | 首选角色 |
+|---|---|
+| 需求、用户场景、范围和验收标准 | `product_analyst` |
+| 架构、模块边界、数据流和公共契约 | `architect` |
+| 需求规格或实施计划 | `spec_plan_reviewer` |
+| 代码、diff、PR 和实现证据 | `reviewer` |
+| 数据模型、迁移、事务、锁和并发 | `data_consistency_reviewer` |
+| 重量任务、项目级高风险修改或明确要求的最终门禁 | `final_gate_reviewer` |
+| 页面目标、信息架构、线框和状态方案 | `ui_ux_designer` |
+| 批准设计与实际截图的视觉验收 | `visual_reviewer` |
+| 明确分配且互不重叠的后端或前端实现 | `worker_backend` / `worker_frontend` |
+| 测试策略、fixture、测试辅助工具和验证 | `test_engineer` |
+| 多模块只读探索或无匹配领域的通用实现 | 内置 `explorer` / `worker` |
+
+单点查找和轻量局部修改直接由主代理完成。一个产物门禁默认只使用一个主要评审角色；只有数据一致性或视觉验收确实构成独立风险时才叠加专项评审。`final_gate_reviewer` 只核对当前任务已触发且适用的门禁，安装、运行或部署证据仅在任务实际涉及这些行为时要求。并行写入只用于文件范围独立、共享契约已冻结的任务。
+
+`tests/fixtures/codex_agent_routing_cases.json` 保存代表性的委派和不委派案例，用于变更角色描述或路由规则时复核角色覆盖、最大子代理数量和内置角色回退边界。
 
 安装事务以 Codex 根目录本身的目录描述符 `root_fd` 获取非阻塞独占锁，不创建持久锁文件。锁内访问从 `root_fd` 逐级使用 no-follow 和 `dir_fd` 操作，并在关键写入前复核根目录设备号和 inode；即使根路径被替换，旧事务也不会写入替代目录。
 

@@ -29,7 +29,7 @@ The installer prefers symlinks or Claude imports so rules stay in sync with this
 
 Existing targets are handled by type: real files are backed up as `*.bak.<timestamp>.<pid>`; symlinks already pointing at this repository are skipped; some generated-file modes remove an old symlink before writing a new file. See [installation details](docs/install.en.md) for the exact behavior.
 
-`codex-agents` is a separate explicit target, so it does not change the existing no-argument or `codex` behavior. It installs 11 versioned roles and conservatively adds three `[agents]` governance keys. See [installation details](docs/install.en.md#global-codex-custom-agents) for transactions, conflicts, and recovery commands.
+`codex-agents` is a separate explicit target, so it does not change the existing no-argument or `codex` behavior. It installs 11 versioned roles and conservatively adds three `[agents]` governance keys. See [installation details](docs/install.en.md#global-codex-custom-agents) for transactions, conflicts, and recovery commands, and [how it works](docs/how-it-works.en.md#codex-role-routing) for role routing and the lightweight effort policy.
 
 ## Common Usage
 

@@ -1,5 +1,5 @@
 name = "data_consistency_reviewer"
-description = "用于数据模型、迁移、事务、锁、隔离、并发、幂等、重试、回滚和共享状态评审；不用于普通后端实现或直接修改迁移与 production code。默认 read-only，禁止修改 production code；不安装依赖、不启动长期服务，不自行 commit、push、merge、tag、release，不改变外部系统或远程资源。"
+description = "用于数据模型、迁移、事务、锁、并发、幂等和恢复专项评审；不用于普通后端实现。read-only，不修改 production code。"
 nickname_candidates = ["Invariant", "Ledger"]
 sandbox_mode = "read-only"
 developer_instructions = """

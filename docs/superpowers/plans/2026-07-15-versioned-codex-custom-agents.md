@@ -5,6 +5,7 @@
 > 依据：已批准的 `docs/superpowers/specs/2026-07-15-versioned-codex-custom-agents-design.md`
 > 门禁：用户已批准规格和计划，实施门禁已打开；按本计划执行实现、验证、本机安装和实施后独立评审。
 > 后续兼容修订：9 个复合角色按用户要求改为下划线名称，并补充旧连字符已完成 journal 的只读兼容；进行中事务与恢复校验保持严格。
+> 后续效率修订：2026-07-18 用户批准精简路由描述、适用门禁、轻量 reasoning effort、路由评测集和索引单源；安装事务、角色数量、sandbox 与并发配置保持不变。
 
 ## 1. 目标与实施边界
 
@@ -117,9 +118,10 @@ description
 developer_instructions
 nickname_candidates
 sandbox_mode
+model_reasoning_effort  # 仅批准的轻量只读角色可选
 ```
 
-不得把 `model`、`model_reasoning_effort`、Provider、MCP 或绝对本机路径写入仓库角色。
+不得把 `model`、Provider、MCP 或绝对本机路径写入仓库角色。`model_reasoning_effort` 仅按规格批准的轻量角色策略使用；其他角色继承父会话。
 
 - [ ] **Step 1.3：建立角色索引和 11 个 TOML**
 
@@ -689,7 +691,7 @@ multi_agent 仍有效
 
 - [x] **Step 11.5：最终全量门禁**
 
-使用 `final_gate_reviewer` 综合核对范围、批准记录、diff、测试、ShellCheck/CI 状态、本机安装、运行时冒烟、能力缺口和未解决项。只有结论为 `APPROVED` 才能报告实施完成。
+使用 `final_gate_reviewer` 综合核对范围、已触发且适用的批准记录、diff、测试、ShellCheck/CI 状态、能力缺口和未解决项；本任务实际涉及本机安装和运行时冒烟，因此同时核对对应证据。只有结论为 `APPROVED` 才能报告实施完成。
 
 ## 4. 计划阶段完成条件
 
