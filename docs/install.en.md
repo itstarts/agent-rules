@@ -53,7 +53,7 @@ max_depth = 1
 interrupt_message = true
 ```
 
-Models, providers, authentication, MCP, plugins, `job_max_runtime_seconds`, role subtables, and all other configuration remain unmanaged. Explicit `multi_agent = false` or an incompatible structure stops safely. A missing config is created with mode `0600`; an existing config is parsed completely with `tomllib`, receives only compatible missing keys, and is atomically replaced from transaction staging on the same Codex-root filesystem.
+Models, providers, authentication, MCP, plugins, `job_max_runtime_seconds`, role subtables, and all other settings in global `config.toml` remain unmanaged. See [how it works](how-it-works.en.md#codex-role-routing) for the lightweight `model_reasoning_effort` policy inside role files. Explicit `multi_agent = false` or an incompatible structure stops safely. A missing config is created with mode `0600`; an existing config is parsed completely with `tomllib`, receives only compatible missing keys, and is atomically replaced from transaction staging on the same Codex-root filesystem.
 
 Every installation that changes state prints a transaction ID containing a UTC timestamp and random suffix. Previous role files, broken-symlink metadata, and config backups live in a protected transaction directory under the Codex root. Directories are no broader than `0700`; regular backups and `journal.toml` are no broader than `0600`. Backups and the journal are durable before the first target changes.
 
@@ -80,6 +80,8 @@ python3 -B scripts/validate_codex_agents.py
 python3 -B scripts/validate_codex_agents.py --installed-root "${CODEX_HOME:-$HOME/.codex}"
 codex --strict-config doctor --json
 ```
+
+Managed roles use per-file symlinks, so repository updates synchronize their contents without another install. To ensure the client reloads role descriptions, routing, and reasoning effort, start a new Codex task after changing role sources.
 
 ## Target Files and Existing Config
 
