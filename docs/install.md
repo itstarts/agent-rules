@@ -53,7 +53,7 @@ max_depth = 1
 interrupt_message = true
 ```
 
-模型、Provider、认证、MCP、插件、`job_max_runtime_seconds`、角色子表及其它配置保持不动；显式 `multi_agent = false` 或不兼容结构会安全停止。配置不存在时以 `0600` 创建；现有配置通过 `tomllib` 完整解析，只补缺失兼容键，并从同一 Codex 根文件系统内的事务 staging 原子替换。
+全局 `config.toml` 中的模型、Provider、认证、MCP、插件、`job_max_runtime_seconds`、角色子表及其它配置保持不动；角色文件自身的轻量 `model_reasoning_effort` 策略见 [工作原理](how-it-works.md#codex-角色路由)。显式 `multi_agent = false` 或不兼容结构会安全停止。配置不存在时以 `0600` 创建；现有配置通过 `tomllib` 完整解析，只补缺失兼容键，并从同一 Codex 根文件系统内的事务 staging 原子替换。
 
 每次发生实际变更都会输出 transaction ID，格式为 UTC 时间戳和随机后缀。角色旧文件、损坏软链元数据和配置备份保存在 Codex 根目录下的受保护事务目录；目录权限不宽于 `0700`，普通备份和 `journal.toml` 不宽于 `0600`。事务先持久化备份与 journal，再修改目标。
 
@@ -80,6 +80,8 @@ python3 -B scripts/validate_codex_agents.py
 python3 -B scripts/validate_codex_agents.py --installed-root "${CODEX_HOME:-$HOME/.codex}"
 codex --strict-config doctor --json
 ```
+
+受管理角色使用逐文件软链，仓库更新后内容会自动同步，不需要重复安装。为确保客户端重新读取角色描述、路由和 reasoning effort，更新角色源码后建议新开 Codex 任务。
 
 ## 目标文件与既有配置
 

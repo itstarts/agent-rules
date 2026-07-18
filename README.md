@@ -56,7 +56,7 @@ ln -s AGENTS.md ./CLAUDE.md
 | [AGENTS.md](AGENTS.md) | 全局工程规则源 |
 | [project-template.md](project-template.md) | 项目级规则模板 |
 | [docs/install.md](docs/install.md) | 安装、迁移、恢复和本机补充 |
-| [docs/how-it-works.md](docs/how-it-works.md) | 文件名、软链/import、全局与项目级规则关系 |
+| [docs/how-it-works.md](docs/how-it-works.md) | 文件职责、同步方式、角色路由和轻量 effort 策略 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献规则 |
 | [SECURITY.md](SECURITY.md) | 安全问题报告 |
 
@@ -70,7 +70,7 @@ python3 -B scripts/validate_codex_agents.py
 python3 -B -m unittest discover -s tests -p 'test_*.py'
 ```
 
-CI 会执行 Bash 语法检查、ShellCheck 和隔离 `HOME` 的安装冒烟测试。若本机未安装 `shellcheck`，至少运行 `bash -n install.sh`，并依赖 CI 补齐 ShellCheck 验证。
+CI 会执行 Bash 语法检查、ShellCheck、Codex 角色校验、全部 Python 测试和隔离 `HOME` 的安装冒烟测试。若本机未安装 `shellcheck`，至少运行 `bash -n install.sh`，并依赖 CI 补齐 ShellCheck 验证。
 
 ## License
 
