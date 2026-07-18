@@ -1,0 +1,132 @@
+{
+  "cases": [
+    {
+      "id": "single-symbol-lookup",
+      "prompt": "查找 UserService 的定义位置。",
+      "should_delegate": false,
+      "expected_roles": [],
+      "max_children": 0,
+      "reason": "单点查找直接搜索，不为委派支付额外协调成本。"
+    },
+    {
+      "id": "requirements-clarification",
+      "prompt": "澄清批量导出功能的用户场景、范围和验收标准。",
+      "should_delegate": true,
+      "expected_roles": ["product_analyst"],
+      "max_children": 1,
+      "reason": "只涉及产品需求边界。"
+    },
+    {
+      "id": "architecture-boundaries",
+      "prompt": "分析订单模块拆分方案、数据流和公共契约取舍。",
+      "should_delegate": true,
+      "expected_roles": ["architect"],
+      "max_children": 1,
+      "reason": "属于架构与模块边界分析。"
+    },
+    {
+      "id": "spec-review",
+      "prompt": "独立评审已经完成的技术规格和实施计划。",
+      "should_delegate": true,
+      "expected_roles": ["spec_plan_reviewer"],
+      "max_children": 1,
+      "reason": "评审对象是规格和计划，不是实现 diff。"
+    },
+    {
+      "id": "implementation-review",
+      "prompt": "评审当前分支相对 main 的实现 diff 和测试缺口。",
+      "should_delegate": true,
+      "expected_roles": ["reviewer"],
+      "max_children": 1,
+      "reason": "评审对象是最新实现。"
+    },
+    {
+      "id": "migration-consistency-review",
+      "prompt": "检查数据库迁移、事务隔离、锁范围和回滚路径。",
+      "should_delegate": true,
+      "expected_roles": ["data_consistency_reviewer"],
+      "max_children": 1,
+      "reason": "高风险数据一致性问题需要专项评审。"
+    },
+    {
+      "id": "backend-implementation",
+      "prompt": "只修改 payment/service.py 和对应后端测试，实现已批准逻辑。",
+      "should_delegate": true,
+      "expected_roles": ["worker_backend"],
+      "max_children": 1,
+      "reason": "后端文件和边界已经明确分配。"
+    },
+    {
+      "id": "frontend-implementation",
+      "prompt": "按批准设计实现订单列表组件及其前端测试。",
+      "should_delegate": true,
+      "expected_roles": ["worker_frontend"],
+      "max_children": 1,
+      "reason": "前端实现范围独立且契约已批准。"
+    },
+    {
+      "id": "test-fixtures",
+      "prompt": "补充测试策略、fixture 和测试辅助工具，不修改生产代码。",
+      "should_delegate": true,
+      "expected_roles": ["test_engineer"],
+      "max_children": 1,
+      "reason": "任务边界完全位于测试资产。"
+    },
+    {
+      "id": "ui-ux-design",
+      "prompt": "设计新页面的信息架构、线框、状态和响应式规则。",
+      "should_delegate": true,
+      "expected_roles": ["ui_ux_designer"],
+      "max_children": 1,
+      "reason": "需要设计依据而不是生产实现。"
+    },
+    {
+      "id": "visual-verification",
+      "prompt": "依据批准稿和实际截图核对视觉还原、焦点和空错误状态。",
+      "should_delegate": true,
+      "expected_roles": ["visual_reviewer"],
+      "max_children": 1,
+      "reason": "属于实现后的视觉验收。"
+    },
+    {
+      "id": "high-risk-final-gate",
+      "prompt": "对已完成的高风险迁移任务核对适用批准、diff、测试和评审证据。",
+      "should_delegate": true,
+      "expected_roles": ["final_gate_reviewer"],
+      "max_children": 1,
+      "reason": "重量高风险任务明确触发最终门禁。"
+    },
+    {
+      "id": "light-doc-edit",
+      "prompt": "修正 README 中的一个错别字并检查 diff。",
+      "should_delegate": false,
+      "expected_roles": [],
+      "max_children": 0,
+      "reason": "轻量局部修改不需要子代理或独立评审。"
+    },
+    {
+      "id": "generic-cli-worker",
+      "prompt": "在明确文件内实现一个与前后端无关的本地 CLI 修复。",
+      "should_delegate": true,
+      "expected_roles": ["worker"],
+      "max_children": 1,
+      "reason": "没有匹配的自定义实现角色，使用内置通用 worker。"
+    },
+    {
+      "id": "large-readonly-exploration",
+      "prompt": "并行梳理三个独立模块的入口、调用链和测试位置。",
+      "should_delegate": true,
+      "expected_roles": ["explorer"],
+      "max_children": 3,
+      "reason": "多模块只读探索适合内置 explorer 并行处理。"
+    },
+    {
+      "id": "parallel-fullstack-slices",
+      "prompt": "后端接口和前端页面契约已批准，文件完全独立，请并行实现并由主代理集成。",
+      "should_delegate": true,
+      "expected_roles": ["worker_backend", "worker_frontend"],
+      "max_children": 2,
+      "reason": "两个写入范围独立且共享契约已经冻结。"
+    }
+  ]
+}

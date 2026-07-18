@@ -61,7 +61,31 @@ Project-level rules may refine workflows and constraints, but should not loosen 
 
 Each managed role's filename exactly matches its TOML `name`, and managed names contain only lowercase letters, digits, and underscores so they can be passed directly as a `spawn_agent` agent name.
 
-Role files contain only `name`, `description`, `developer_instructions`, `nickname_candidates`, and `sandbox_mode`. Analysis and review roles default to `read-only`; explicitly scoped implementation roles default to `workspace-write`. A parent session's live permission policy is reapplied, so role files express auditable defaults and responsibility boundaries rather than an unbypassable security boundary.
+Role files contain `name`, a concise routing `description`, `developer_instructions`, `nickname_candidates`, `sandbox_mode`, and optional `model_reasoning_effort`. Analysis and review roles default to `read-only`; explicitly scoped implementation roles default to `workspace-write`. A parent session's live permission policy is reapplied, so role files express auditable defaults and responsibility boundaries rather than an unbypassable security boundary.
+
+`product_analyst`, `ui_ux_designer`, and `visual_reviewer` are bounded lightweight read-only roles and set `model_reasoning_effort = "medium"` to control latency and usage. Architecture, implementation, testing, code review, data-consistency, and final-gate roles do not pin a model or reasoning effort; they continue to inherit the parent session so complex work does not lose capability or become tied to one provider.
+
+## Codex Role Routing
+
+Prefer the single role that best matches the current artifact and task boundary:
+
+| Current task or artifact | Preferred role |
+|---|---|
+| Requirements, user scenarios, scope, and acceptance criteria | `product_analyst` |
+| Architecture, module boundaries, data flow, and public contracts | `architect` |
+| Requirements specifications or implementation plans | `spec_plan_reviewer` |
+| Code, diffs, PRs, and implementation evidence | `reviewer` |
+| Data models, migrations, transactions, locks, and concurrency | `data_consistency_reviewer` |
+| Final gate for heavyweight work, project-level high-risk changes, or an explicit request | `final_gate_reviewer` |
+| Page goals, information architecture, wireframes, and state design | `ui_ux_designer` |
+| Visual verification against an approved design and actual screenshots | `visual_reviewer` |
+| Explicitly assigned, non-overlapping backend or frontend implementation | `worker_backend` / `worker_frontend` |
+| Test strategy, fixtures, test helpers, and validation | `test_engineer` |
+| Multi-module read-only exploration or generic implementation without a matching custom role | built-in `explorer` / `worker` |
+
+The main agent handles single-point lookups and lightweight local edits directly. Use one primary review role per artifact gate by default; add a specialist only when data consistency or visual verification is a distinct risk. `final_gate_reviewer` checks only gates that were triggered and are applicable to the current task. Installation, runtime, or deployment evidence is required only when the task actually includes those actions. Parallel writes are reserved for independent file scopes with a frozen shared contract.
+
+`tests/fixtures/codex_agent_routing_cases.json` stores representative delegation and no-delegation cases for checking role coverage, child-agent limits, and built-in fallback boundaries whenever descriptions or routing rules change.
 
 The installation transaction takes a non-blocking exclusive lock on the Codex root directory descriptor itself, named `root_fd`, without creating a persistent lock file. All in-root access starts from `root_fd` and uses no-follow and `dir_fd` operations. The installer rechecks the root device and inode before critical writes, so replacing the root path cannot redirect an old transaction into the replacement directory.
 

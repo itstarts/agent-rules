@@ -29,7 +29,7 @@ cd ~/agent-rules
 
 已有目标文件时，脚本会按目标类型处理：真实文件会备份为 `*.bak.<timestamp>.<pid>`；指向本仓库源的软链会跳过；部分生成模式会先移除旧软链再写入新文件。完整行为见 [安装细节](docs/install.md)。
 
-`codex-agents` 是独立、显式入口，不会改变无参数或 `codex` 目标的既有行为。它安装 11 个版本化角色并保守补齐 `[agents]` 三个治理键；事务、冲突和恢复命令见 [安装细节](docs/install.md#codex-全局自定义角色)。
+`codex-agents` 是独立、显式入口，不会改变无参数或 `codex` 目标的既有行为。它安装 11 个版本化角色并保守补齐 `[agents]` 三个治理键；事务、冲突和恢复命令见 [安装细节](docs/install.md#codex-全局自定义角色)，角色路由和轻量 effort 策略见 [工作原理](docs/how-it-works.md#codex-角色路由)。
 
 ## 常见用法
 

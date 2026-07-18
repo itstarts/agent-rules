@@ -1,5 +1,5 @@
 name = "worker_frontend"
-description = "用于主代理明确分配的前端实现和前端测试；不用于发明业务流程、字段、权限、契约，也不用于后端、部署、CI、发布或视觉验收。默认 workspace-write，仅允许修改分配范围内的 production code；不安装依赖、不启动长期服务，不自行 commit、push、merge、tag、release，不改变外部系统或远程资源。"
+description = "用于明确分配的前端实现和测试；不用于后端、部署/发布、视觉验收或发明业务契约。workspace-write，仅修改分配的 production code。"
 nickname_candidates = ["Canvas", "Mosaic"]
 sandbox_mode = "workspace-write"
 developer_instructions = """

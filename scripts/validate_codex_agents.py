@@ -9,25 +9,17 @@ from pathlib import Path
 from typing import Any
 
 
-EXPECTED_SANDBOX = {
-    "architect": "read-only",
-    "data_consistency_reviewer": "read-only",
-    "final_gate_reviewer": "read-only",
-    "product_analyst": "read-only",
-    "reviewer": "read-only",
-    "spec_plan_reviewer": "read-only",
-    "test_engineer": "workspace-write",
-    "ui_ux_designer": "read-only",
-    "visual_reviewer": "read-only",
-    "worker_backend": "workspace-write",
-    "worker_frontend": "workspace-write",
-}
+ALLOWED_SANDBOX_MODES = {"read-only", "workspace-write"}
+ALLOWED_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+MAX_DESCRIPTION_CHARS = 120
+MAX_TOTAL_DESCRIPTION_CHARS = 1100
 ALLOWED_FIELDS = {
     "name",
     "description",
     "developer_instructions",
     "nickname_candidates",
     "sandbox_mode",
+    "model_reasoning_effort",
 }
 REQUIRED_FIELDS = {"name", "description", "developer_instructions"}
 NAME_RE = re.compile(r"^[a-z0-9_]+$")
@@ -36,14 +28,6 @@ DESCRIPTION_MARKERS = (
     "用于",
     "不用于",
     "production code",
-    "依赖",
-    "长期服务",
-    "commit",
-    "push",
-    "merge",
-    "tag",
-    "release",
-    "外部系统",
 )
 READ_ONLY_MARKERS = ("不修改", "不创建", "不删除", "不安装依赖", "不启动本地长期服务")
 WRITE_MARKERS = ("明确分配", "不覆盖", "不扩大", "不安装依赖", "掩盖")
@@ -107,15 +91,12 @@ def _load_role(path: Path) -> dict[str, Any]:
 
 def validate_source(source_dir: Path) -> int:
     names = _read_index(source_dir)
-    expected = sorted(EXPECTED_SANDBOX)
-    if names != expected:
-        raise ValidationError("managed-agents.txt: managed-set-mismatch")
-
     toml_names = sorted(path.stem for path in source_dir.glob("*.toml"))
-    if toml_names != expected:
+    if toml_names != names:
         raise ValidationError("codex/agents: toml-set-mismatch")
 
     all_nicknames: set[str] = set()
+    total_description_chars = 0
     for name in names:
         path = source_dir / f"{name}.toml"
         data = _load_role(path)
@@ -128,8 +109,15 @@ def validate_source(source_dir: Path) -> int:
                 raise ValidationError(f"{path.name}: missing-or-empty:{field}")
         if data["name"] != name or not NAME_RE.fullmatch(data["name"]):
             raise ValidationError(f"{path.name}: name-mismatch-or-invalid")
-        if data.get("sandbox_mode") != EXPECTED_SANDBOX[name]:
+        sandbox_mode = data.get("sandbox_mode")
+        if sandbox_mode not in ALLOWED_SANDBOX_MODES:
             raise ValidationError(f"{path.name}: sandbox-mismatch")
+
+        reasoning_effort = data.get("model_reasoning_effort")
+        if reasoning_effort is not None and (
+            not isinstance(reasoning_effort, str) or reasoning_effort not in ALLOWED_REASONING_EFFORTS
+        ):
+            raise ValidationError(f"{path.name}: invalid-model-reasoning-effort")
 
         nicknames = data.get("nickname_candidates")
         if not isinstance(nicknames, list) or not nicknames:
@@ -144,25 +132,31 @@ def validate_source(source_dir: Path) -> int:
         all_nicknames.update(nicknames)
 
         description = data["description"]
-        for marker in DESCRIPTION_MARKERS + (EXPECTED_SANDBOX[name],):
+        if len(description) > MAX_DESCRIPTION_CHARS:
+            raise ValidationError(f"{path.name}: description-too-long")
+        total_description_chars += len(description)
+        for marker in DESCRIPTION_MARKERS + (sandbox_mode,):
             if marker not in description:
                 raise ValidationError(f"{path.name}: description-boundary-missing")
 
         instructions = data["developer_instructions"]
-        markers = READ_ONLY_MARKERS if EXPECTED_SANDBOX[name] == "read-only" else WRITE_MARKERS
+        markers = READ_ONLY_MARKERS if sandbox_mode == "read-only" else WRITE_MARKERS
         for marker in markers:
             if marker not in instructions:
                 raise ValidationError(f"{path.name}: instruction-boundary-missing")
         category = _sensitive_category(path.read_text(encoding="utf-8"))
         if category:
             raise ValidationError(f"{path.name}: {category}")
+    if total_description_chars > MAX_TOTAL_DESCRIPTION_CHARS:
+        raise ValidationError("codex/agents: description-total-too-long")
     return len(names)
 
 
 def validate_installed(source_dir: Path, installed_root: Path) -> None:
     agents_dir = installed_root / "agents"
-    for name in sorted(EXPECTED_SANDBOX):
+    for name in _read_index(source_dir):
         source = (source_dir / f"{name}.toml").resolve(strict=True)
+        source_data = _load_role(source)
         target = agents_dir / f"{name}.toml"
         if not target.is_symlink():
             raise ValidationError(f"{target.name}: installed-target-not-symlink")
@@ -173,7 +167,7 @@ def validate_installed(source_dir: Path, installed_root: Path) -> None:
         if resolved != source:
             raise ValidationError(f"{target.name}: installed-target-mismatch")
         data = _load_role(target)
-        if data.get("name") != name or data.get("sandbox_mode") != EXPECTED_SANDBOX[name]:
+        if data.get("name") != name or data.get("sandbox_mode") != source_data.get("sandbox_mode"):
             raise ValidationError(f"{target.name}: installed-content-mismatch")
 
 

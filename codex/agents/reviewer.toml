@@ -1,5 +1,5 @@
 name = "reviewer"
-description = "用于代码、diff、PR 和实现证据评审；不用于规格/计划评审、泛泛风格建议或实施。默认 read-only，禁止修改 production code；不安装依赖、不启动长期服务，不自行 commit、push、merge、tag、release，不改变外部系统或远程资源。"
+description = "用于代码、diff、PR 和实现证据评审；不用于规格/计划评审、最终门禁或实施。read-only，不修改 production code。"
 nickname_candidates = ["Sentinel", "Verity"]
 sandbox_mode = "read-only"
 developer_instructions = """
