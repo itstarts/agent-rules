@@ -26,14 +26,13 @@ class InstallerDispatchTests(unittest.TestCase):
             check=False,
         )
 
-    def test_default_behavior_remains_codex_and_claude(self) -> None:
+    def test_default_behavior_installs_only_codex_rules(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             result = self.run_installer(home)
 
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertEqual(REPO / "AGENTS.md", (home / ".codex" / "AGENTS.md").resolve())
-            self.assertEqual(REPO / "AGENTS.md", (home / ".claude" / "CLAUDE.md").resolve())
             self.assertFalse((home / ".codex" / "agents").exists())
             self.assertFalse((home / ".codex" / "config.toml").exists())
 

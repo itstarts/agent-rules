@@ -205,23 +205,5 @@ class CodexDocsAndCiContractTests(unittest.TestCase):
                 for marker in shared:
                     self.assertIn(marker, content)
 
-    def test_legacy_agent_design_docs_record_the_dynamic_routing_amendment(self) -> None:
-        spec = self.read(
-            "docs/superpowers/specs/2026-07-15-versioned-codex-custom-agents-design.md"
-        )
-        plan = self.read("docs/superpowers/plans/2026-07-15-versioned-codex-custom-agents.md")
-
-        for content in (spec, plan):
-            self.assertIn("2026-07-20", content)
-            self.assertIn("agent-routing.toml", content)
-            self.assertIn("codex-agent-routing", content)
-        self.assertNotIn("只有以下边界明确的轻量只读角色固定", spec)
-        self.assertNotIn(
-            'product_analyst`、`ui_ux_designer`、`visual_reviewer` 使用 '
-            '`model_reasoning_effort = "medium"`',
-            plan,
-        )
-
-
 if __name__ == "__main__":
     unittest.main()

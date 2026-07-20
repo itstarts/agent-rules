@@ -2,14 +2,13 @@
 
 [简体中文](how-it-works.md)
 
-This repository treats `AGENTS.md` as the single rule source, then wires it into different tools through symlinks, Claude imports, or concatenated files.
+This repository treats `AGENTS.md` as the single rule source, then wires it into Codex through a symlink or concatenated file.
 
 ## File Responsibilities
 
 | File | Responsibility |
 |------|----------------|
 | `AGENTS.md` | Global engineering rule source |
-| `CLAUDE.md` | Repository symlink pointing at `AGENTS.md` |
 | `project-template.md` | Project-level rule template |
 | `install.sh` | Local installer |
 | `codex/agents/` | Versioned Codex custom-agent sources |
@@ -17,25 +16,18 @@ This repository treats `AGENTS.md` as the single rule source, then wires it into
 | `codex/agent-routing.toml` | Model aliases, role defaults, risk escalation, and runtime feature gates |
 | `scripts/codex_agent_router.py` | `PreToolUse` routing Hook |
 
-## Tool Filename Differences
+## Codex Rule Entry Point
 
-Different tools read different filenames:
-
-- Tools that support `AGENTS.md`, including Codex, can read it directly.
-- Claude Code uses `CLAUDE.md` and supports `@` imports.
-- Gemini CLI uses `GEMINI.md`.
-
-This repository's installer only wires the global rule source into common global locations for Codex, Claude Code, and Gemini CLI. Other tools that support project-root `AGENTS.md` usually do not need extra bridging from this repository; if they need global config, follow that tool's documentation.
+Codex reads `AGENTS.md` directly. This repository's installer only wires the rule source into Codex's global location.
 
 ## Sync Model
 
 `AGENTS.md` is the single source. Sync behavior depends on install mode:
 
 - Symlink: the target file points at repository `AGENTS.md`.
-- Claude import: the target file contains `@/path/to/AGENTS.md`.
 - Concatenated file: the target file contains the repository source plus a per-machine extra.
 
-Symlink and import modes take effect after repository updates. Concatenated files require re-running `./install.sh`.
+Symlink mode takes effect after repository updates. Concatenated files require re-running `./install.sh`.
 
 ## Global Rules and Project-Level Rules
 
@@ -45,7 +37,6 @@ Recommended project-level setup:
 
 ```bash
 cp ~/agent-rules/project-template.md ./AGENTS.md
-ln -s AGENTS.md ./CLAUDE.md
 ```
 
 Priority:
@@ -133,7 +124,7 @@ After backups are complete and `fsync` has made them durable, the transaction pu
 
 ## Design Tradeoffs
 
-- Keep `AGENTS.md` as a single source to avoid drift across tool-specific files.
+- Keep `AGENTS.md` as a single source to avoid drift across rule files.
 - Make the installer conservative around existing config so real files are not overwritten silently.
 - Keep per-machine extras out of the repository so personal paths or external-service conventions do not leak into shared rules.
 - Keep global rules tech-stack agnostic by default. Add domain rules conditionally only when they are reusable across projects and have explicit activation criteria; concrete stack constraints still belong in project-level `AGENTS.md`.

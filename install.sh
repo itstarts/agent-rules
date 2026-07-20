@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
-# 在新机器 / 已有配置的机器上,把本仓库的全局规则接到各 AI agent。
+# 在新机器 / 已有配置的机器上,把本仓库的全局规则接入 Codex。
 #
 # 用法:
-#   ./install.sh                       # 接 Codex + Claude(默认)
-#   ./install.sh codex claude gemini   # 指定要接的工具
+#   ./install.sh                       # 接入 Codex(默认)
+#   ./install.sh codex                 # 显式接入 Codex
 #   ./install.sh codex-agents          # 显式安装 Codex 自定义角色
 #   ./install.sh codex-agent-routing   # 显式安装 Sub Agent 动态路由 Hook
-#   CLAUDE_MODE=import ./install.sh     # Claude 用 @import(保留专属补充),默认 symlink
 #
 # 本机专属补充:
-#   把不进仓库、只在本机生效的规则放到 ~/.agent-rules-local/<tool>.md
-#   (例如 ~/.agent-rules-local/codex.md)。安装时会自动叠加到对应工具:
-#     - 支持 import 的工具(Claude):用 @import 引入,随 git pull 自动同步。
-#     - 不支持 import 的工具(Codex/Gemini):生成"仓库源 + 专属"的拼接文件;
-#       仓库源更新后重跑 ./install.sh 即可重新拼接同步。
+#   把不进仓库、只在本机生效的规则放到 ~/.agent-rules-local/codex.md。
+#   安装时会生成"仓库源 + 专属"的拼接文件;
+#   仓库源更新后重跑 ./install.sh 即可重新拼接同步。
 #
 # 幂等:重复运行安全。已存在的真实文件 / 指向别处的软链会先备份成 *.bak.<时间戳>。
 
@@ -23,13 +20,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SRC="$REPO/AGENTS.md"
 CODEX_AGENTS_HELPER="$REPO/scripts/codex_agents.py"
 CODEX_AGENT_ROUTING_HELPER="$REPO/scripts/codex_agent_routing_install.py"
-CLAUDE_MODE="${CLAUDE_MODE:-symlink}"
 LOCAL_DIR="${AGENT_RULES_LOCAL:-$HOME/.agent-rules-local}"
-
-if [[ "$CLAUDE_MODE" != "symlink" && "$CLAUDE_MODE" != "import" ]]; then
-  echo "✗ 非法 CLAUDE_MODE=$CLAUDE_MODE(仅支持 symlink / import)" >&2
-  exit 2
-fi
 
 if [[ ! -f "$SRC" ]]; then
   echo "✗ 找不到源文件 $SRC,仓库是否完整?" >&2
@@ -38,7 +29,7 @@ fi
 
 # 先验证完整参数，再执行任何目标，避免错误参数造成部分安装。
 TOOLS=("$@")
-[[ ${#TOOLS[@]} -eq 0 ]] && TOOLS=(codex claude)
+[[ ${#TOOLS[@]} -eq 0 ]] && TOOLS=(codex)
 
 require_codex_agents_python() {
   if ! python3 -c 'import sys, tomllib; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
@@ -70,13 +61,13 @@ fi
 
 for t in "${TOOLS[@]}"; do
   case "$t" in
-    codex|claude|gemini|codex-agents|codex-agent-routing) ;;
+    codex|codex-agents|codex-agent-routing) ;;
     codex-agents-recover|codex-agents-restore|codex-agent-routing-recover|codex-agent-routing-restore)
       echo "✗ $t 必须独占命令行并接收一个 transaction ID" >&2
       exit 2
       ;;
     *)
-      echo "✗ 未知工具名:$t(支持 codex / claude / gemini / codex-agents / codex-agent-routing)" >&2
+      echo "✗ 未知工具名:$t(支持 codex / codex-agents / codex-agent-routing)" >&2
       exit 2
       ;;
   esac
@@ -184,30 +175,9 @@ install_concat_tool() {
 }
 
 install_codex()  { install_concat_tool codex  "$HOME/.codex/AGENTS.md"; }
-install_gemini() { install_concat_tool gemini "$HOME/.gemini/GEMINI.md"; }
 install_codex_agents() { require_codex_agents_python && python3 "$CODEX_AGENTS_HELPER" install; }
 install_codex_agent_routing() {
   require_codex_agents_python && python3 "$CODEX_AGENT_ROUTING_HELPER" install
-}
-
-# Claude 支持 import:symlink 模式或 import 模式
-install_claude() {
-  echo "[claude]"
-  local target="$HOME/.claude/CLAUDE.md"
-  local extra; extra="$(local_extra claude)" || true
-  # 有本机专属时强制走 import(软链无法叠加)
-  if [[ "$CLAUDE_MODE" == "import" || -n "$extra" ]]; then
-    mkdir -p "$(dirname "$target")"
-    prepare_write_target "$target"
-    {
-      echo "@$SRC"
-      echo
-      if [[ -n "$extra" ]]; then echo "@$extra"; else echo "## Claude 专属补充"; echo; fi
-    } > "$target"
-    echo "  写入 import:$target(@仓库源${extra:+ + @$extra})"
-  else
-    link_to_src "$target"
-  fi
 }
 
 echo "源:$SRC"
@@ -217,13 +187,11 @@ echo
 for t in "${TOOLS[@]}"; do
   case "$t" in
     codex)  install_codex ;;
-    claude) install_claude ;;
-    gemini) install_gemini ;;
     codex-agents) install_codex_agents ;;
     codex-agent-routing) install_codex_agent_routing ;;
   esac
 done
 echo
 echo "✓ 完成。"
-echo "  - 纯软链 / import 的工具:git pull 更新仓库源后自动同步。"
-echo "  - 拼接生成的工具(含本机专属):git pull 后重跑 ./install.sh 重新拼接。"
+echo "  - 纯软链:git pull 更新仓库源后自动同步。"
+echo "  - 含本机专属的拼接文件:git pull 后重跑 ./install.sh 重新拼接。"
