@@ -86,6 +86,8 @@
 - 不主动 commit、push、tag 或 release，除非用户明确要求。默认不直接 push 到 `main` / `master`；需要提交时先使用开发分支。
 - 用户要求 commit 时，使用 `<type>: 中文描述`，其中 type 可取 `feat`、`fix`、`docs`、`refactor`、`test`、`chore`、`build` 等。
 - 分支合入默认使用 merge；不默认强推或改写历史。`cherry-pick` 仅用于选择性合入个别 commit；`rebase` 仅用于明确需要线性历史，或分支尚未共享且确认可改写历史的场景。
+- 最近一个已发布、已通过全部可达 Git 历史安全审计且此后未移动、删除或重建的 release tag，可作为后续发布的历史安全基线。后续发布默认只扫描当前树及该 tag 之后新增的可达历史；首次发布、历史被改写、基线不可验证或增量扫描异常时，必须重新扫描全部可达 Git 历史。release tag 一经发布不得移动、覆盖、删除或复用。
+- Release notes 统一以 `## 本版内容` 开头，按 Keep a Changelog 分类记录实际变更，随后列出 `### Verification` 和完整变更链接；无内容的分类不保留。首次发布使用当前 tag 的源码链接，后续发布使用上一 release tag 到当前 tag 的 compare 链接。
 
 ## 9. Sub Agent 与独立评审
 

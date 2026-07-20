@@ -21,6 +21,104 @@ class CodexDocsAndCiContractTests(unittest.TestCase):
         for marker in ('fork_turns = "none"', "正整数", '"all"', "继承父 Agent"):
             self.assertIn(marker, rules)
 
+    def test_release_audit_baseline_and_notes_format_are_governed(self) -> None:
+        rules = self.read("AGENTS.md")
+        for marker in (
+            "历史安全基线",
+            "该 tag 之后新增的可达历史",
+            "基线不可验证",
+            "不得移动、覆盖、删除或复用",
+            "## 本版内容",
+            "Keep a Changelog",
+            "### Verification",
+            "compare 链接",
+        ):
+            self.assertIn(marker, rules)
+
+        contributing = self.read("CONTRIBUTING.md")
+        chinese_process = contributing.split("## 发版流程", 1)[1].split(
+            "## Release notes 模板", 1
+        )[0]
+        english_process = contributing.split("### Release Process", 1)[1].split(
+            "### Release Notes Template", 1
+        )[0]
+
+        for section in (chinese_process, english_process):
+            for marker in (
+                "git rev-list --all",
+                "BASELINE_TAG..HEAD",
+                "GitHub Release",
+                "annotated tag",
+            ):
+                self.assertIn(marker, section)
+
+        for section, markers in (
+            (
+                chinese_process,
+                (
+                    "历史被改写",
+                    "基线不可验证",
+                    "增量扫描异常",
+                    "回退到全量扫描",
+                    "peeled commit 与 `main` 一致",
+                    "以只读方式核对",
+                ),
+            ),
+            (
+                english_process,
+                (
+                    "rewritten history",
+                    "an unverifiable baseline",
+                    "incremental-scan anomaly",
+                    "Fall back to a full audit",
+                    "peeled commit matches `main`",
+                    "read back and verify",
+                ),
+            ),
+        ):
+            for marker in markers:
+                self.assertIn(marker, section)
+
+        chinese_order = (
+            "合入 `main`",
+            "等待合入提交的 CI 成功",
+            "精确且干净的最终 `main` 提交上执行",
+            "定稿 Release notes",
+            "在本地创建 annotated tag",
+            "推送 tag 后再次核对远端 tag 身份",
+            "创建 GitHub Release",
+        )
+        english_order = (
+            "Merge into `main`",
+            "wait for CI on the merge commit to pass",
+            "exact, clean final `main` commit",
+            "Finalize the release notes",
+            "Create the annotated tag locally",
+            "Push the tag, then verify the remote tag identity",
+            "Create the GitHub Release",
+        )
+        for section, markers in (
+            (chinese_process, chinese_order),
+            (english_process, english_order),
+        ):
+            positions = [section.index(marker) for marker in markers]
+            self.assertEqual(positions, sorted(positions))
+
+        chinese_template = contributing.split("## Release notes 模板", 1)[1].split(
+            "## English", 1
+        )[0]
+        english_template = contributing.split("### Release Notes Template", 1)[1]
+        for section in (chinese_template, english_template):
+            for marker in (
+                "## 本版内容",
+                "### Verification",
+                "/compare/vPREVIOUS...vCURRENT",
+                "/tree/vCURRENT",
+            ):
+                self.assertIn(marker, section)
+        self.assertIn("空分类省略", chinese_template)
+        self.assertIn("Keep only applicable", english_template)
+
     def test_readmes_expose_only_the_short_install_entries(self) -> None:
         for relative in ("README.md", "README.en.md"):
             with self.subTest(relative=relative):
