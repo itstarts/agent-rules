@@ -13,8 +13,6 @@
 `install.sh` 会写入以下用户目录目标：
 
 - `~/.codex/AGENTS.md`
-- `~/.claude/CLAUDE.md`
-- `~/.gemini/GEMINI.md`
 
 脚本会备份既有真实文件，拒绝把仓库内路径作为安装目标，并避免顺着旧软链覆盖源文件。更多细节见 [docs/install.md](docs/install.md)。
 
@@ -31,7 +29,5 @@ Do not post tokens, secrets, private paths, full local config, or other sensitiv
 `install.sh` writes to these user-level targets:
 
 - `~/.codex/AGENTS.md`
-- `~/.claude/CLAUDE.md`
-- `~/.gemini/GEMINI.md`
 
 The script backs up existing real files, refuses repository-internal install targets, and avoids writing through old symlinks onto their sources. See [docs/install.en.md](docs/install.en.md) for details.

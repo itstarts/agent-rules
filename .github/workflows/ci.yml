@@ -29,27 +29,19 @@ jobs:
           TMP="$(mktemp -d)"
           run() { HOME="$TMP" ./install.sh "$@"; }
 
-          echo "== 1. 首次安装 codex + claude =="
-          run codex claude
+          echo "== 1. 首次安装 codex =="
+          run codex
           [ "$(readlink "$TMP/.codex/AGENTS.md")" = "$PWD/AGENTS.md" ] || { echo "codex 软链未指向仓库源"; exit 1; }
-          [ "$(readlink "$TMP/.claude/CLAUDE.md")" = "$PWD/AGENTS.md" ] || { echo "claude 软链未指向仓库源"; exit 1; }
 
           echo "== 2. 幂等重跑应跳过 =="
-          out2="$(run codex claude)"
+          out2="$(run codex)"
           echo "$out2"
           case "$out2" in *已就绪*) ;; *) echo "幂等重跑未识别已就绪"; exit 1;; esac
 
           echo "== 3. 未知工具名应非零退出 =="
           if HOME="$TMP" ./install.sh bogus-tool; then echo "未知工具名未触发非零退出"; exit 1; fi
 
-          echo "== 4. 非法 CLAUDE_MODE 应非零退出 =="
-          if HOME="$TMP" CLAUDE_MODE=bogus ./install.sh claude; then echo "非法 CLAUDE_MODE 未触发非零退出"; exit 1; fi
-
-          echo "== 5. import 模式应写入 @ 引用 =="
-          HOME="$TMP" CLAUDE_MODE=import ./install.sh claude
-          grep -q "^@$PWD/AGENTS.md" "$TMP/.claude/CLAUDE.md" || { echo "import 模式未写入仓库源引用"; exit 1; }
-
-          echo "== 6. 拒绝写入仓库内路径 =="
+          echo "== 4. 拒绝写入仓库内路径 =="
           if HOME="$PWD" ./install.sh codex 2>/dev/null; then echo "未拦截写入仓库内路径"; exit 1; fi
 
           rm -rf "$TMP"
