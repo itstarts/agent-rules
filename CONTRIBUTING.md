@@ -40,7 +40,7 @@ shellcheck install.sh
    安全扫描至少检查凭证和密钥、本机绝对路径、个人隐私，以及误提交的生成物或大文件；匹配结果不得在公开日志中回显敏感值。
 5. 根据最终验证与审计事实定稿 Release notes，并确认待创建的 annotated tag 将指向当前 `main` 提交。
 6. 在本地创建 annotated tag，确认其 peeled commit 与 `main` 一致；推送 tag 后再次核对远端 tag 身份。已发布的 release tag 不得移动、覆盖、删除或复用。
-7. 使用已经定稿的 notes 创建 GitHub Release，再以只读方式核对 tag、Release 与 `main` 提交一致，且公开文案完整。
+7. 使用已经定稿的 notes 创建 GitHub Release，名称只使用对应版本号（如 `v1.2.3`），不附加主题、副标题或其它文本；再以只读方式核对 tag、Release 与 `main` 提交一致，且公开文案完整。
 8. 删除已合入的本地和远端开发分支。
 
 ## Release notes 模板
@@ -107,7 +107,7 @@ If `shellcheck` is not installed locally, run at least `bash -n install.sh` and 
    At minimum, audit credentials and secrets, machine-specific absolute paths, private data, and unintended generated or oversized files. Never echo matched secret values into public logs.
 5. Finalize the release notes from the final validation and audit facts, and confirm that the intended annotated tag will point to the current `main` commit.
 6. Create the annotated tag locally and verify that its peeled commit matches `main`. Push the tag, then verify the remote tag identity. A published release tag must never be moved, overwritten, deleted, or reused.
-7. Create the GitHub Release with the finalized notes, then read back and verify that the tag, Release, and `main` resolve to the same commit and that the public notes are complete.
+7. Create the GitHub Release with the finalized notes. Use only the corresponding version number (for example, `v1.2.3`) as its name; do not append a theme, subtitle, or any other text. Then read back and verify that the tag, Release, and `main` resolve to the same commit and that the public notes are complete.
 8. Delete the merged local and remote development branches.
 
 ### Release Notes Template
