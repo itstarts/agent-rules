@@ -14,6 +14,8 @@ This repository treats `AGENTS.md` as the single rule source, then wires it into
 | `install.sh` | Local installer |
 | `codex/agents/` | Versioned Codex custom-agent sources |
 | `codex/agents/managed-agents.txt` | The installer's only ownership index |
+| `codex/agent-routing.toml` | Model aliases, role defaults, risk escalation, and runtime feature gates |
+| `scripts/codex_agent_router.py` | `PreToolUse` routing Hook |
 
 ## Tool Filename Differences
 
@@ -61,9 +63,7 @@ Project-level rules may refine workflows and constraints, but should not loosen 
 
 Each managed role's filename exactly matches its TOML `name`, and managed names contain only lowercase letters, digits, and underscores so they can be passed directly as a `spawn_agent` agent name.
 
-Role files contain `name`, a concise routing `description`, `developer_instructions`, `nickname_candidates`, `sandbox_mode`, and optional `model_reasoning_effort`. Analysis and review roles default to `read-only`; explicitly scoped implementation roles default to `workspace-write`. A parent session's live permission policy is reapplied, so role files express auditable defaults and responsibility boundaries rather than an unbypassable security boundary.
-
-`product_analyst`, `ui_ux_designer`, and `visual_reviewer` are bounded lightweight read-only roles and set `model_reasoning_effort = "medium"` to control latency and usage. Architecture, implementation, testing, code review, data-consistency, and final-gate roles do not pin a model or reasoning effort; they continue to inherit the parent session so complex work does not lose capability or become tied to one provider.
+Role files contain `name`, a concise routing `description`, `developer_instructions`, `nickname_candidates`, and `sandbox_mode`. They no longer pin `model` or `model_reasoning_effort`. Analysis and review roles default to `read-only`; explicitly scoped implementation roles default to `workspace-write`. A parent session's live permission policy is reapplied, so role files express auditable defaults and responsibility boundaries rather than an unbypassable security boundary. Models and `reasoning_effort` are centralized in `agent-routing.toml`, so a model upgrade changes only its alias mapping.
 
 ## Codex Role Routing
 
@@ -87,7 +87,47 @@ The main agent handles single-point lookups and lightweight local edits directly
 
 `tests/fixtures/codex_agent_routing_cases.json` stores representative delegation and no-delegation cases for checking role coverage, child-agent limits, and built-in fallback boundaries whenever descriptions or routing rules change.
 
-The installation transaction takes a non-blocking exclusive lock on the Codex root directory descriptor itself, named `root_fd`, without creating a persistent lock file. All in-root access starts from `root_fd` and uses no-follow and `dir_fd` operations. The installer rechecks the root device and inode before critical writes, so replacing the root path cannot redirect an old transaction into the replacement directory.
+### Default model + effort by role
+
+A `routine` dispatch uses the role default. Sol, Terra, and Luna are stable policy-tier names. Concrete model identifiers live under `[models]` in `agent-routing.toml` instead of being repeated in role files or `AGENTS.md`.
+
+| Role | Model tier | `reasoning_effort` |
+|---|---|---|
+| `architect`, `data_consistency_reviewer` | Sol | `xhigh` |
+| `final_gate_reviewer` | Sol | `max` |
+| `reviewer`, `spec_plan_reviewer` | Sol | `high` |
+| `worker_backend`, `worker_frontend`, built-in `worker` / `default` | Sol | `high` |
+| `ui_ux_designer` | Sol | `medium` |
+| `test_engineer` | Terra | `high` |
+| `product_analyst`, `visual_reviewer`, built-in `explorer` | Terra | `medium` |
+
+These defaults describe the capability usually needed by a role; they do not classify task risk. The main agent also selects a route class from actual impact:
+
+| `ROUTING_CLASS` | Behavior |
+|---|---|
+| `routine` | Use the role default |
+| `complex` | Raise to at least Sol + `high` |
+| `critical` | Raise to at least Sol + `xhigh`; keep `max` for `final_gate_reviewer` |
+| `mechanical` | Use Luna + `medium` only for mechanical work with explicit inputs and outputs |
+
+Dynamic runtime overrides currently enable Sol and Terra only. Luna is present as a policy tier but is not yet in `dynamic_tiers`; a `mechanical` dispatch is explicitly denied instead of silently falling back to Terra. When the runtime supports Luna, update `[models].luna` and add `luna` to `dynamic_tiers`; role files do not need to change.
+
+### Automatic switching flow and limits
+
+The main agent classifies semantic impact, not isolated keywords such as “permission” or “migration.” Checking a permission label may be `routine`; changing a public permission contract is `critical`. Every dispatch message includes:
+
+```text
+ROUTING_CLASS=critical
+ROUTING_REASON=Changes a public permission contract and affects existing callers
+```
+
+For compatibility with existing dispatches that have not been updated yet, a message with both markers completely absent uses the role's `routine` default and adds `missing-routing-markers` context. A partial, duplicate, misspelled, or malformed marker is denied instead of being silently treated as a default.
+
+At `PreToolUse`, `codex_agent_router.py` intercepts `Agent`, combines the role default with the risk class, chooses the stronger configuration, and writes `model` plus `reasoning_effort` back into the dispatch input. Explicit overrides require `fork_turns` to be `"none"` or a positive integer. Full history with `"all"` can only inherit from the parent, so the Hook denies that combination. Unmanaged third-party agent types are unchanged.
+
+The Hook controls one dispatch; it cannot replace the model of a Sub Agent that is already running. When a child discovers a larger scope or risk, it returns `ESCALATION_REQUIRED`. The main agent stops relying on the lower route and dispatches again with a higher `ROUTING_CLASS`. This provides auditable automatic selection and controlled escalation without replacing user approval, permission, security, test, or review gates.
+
+Both the role installer and routing-Hook installer take a non-blocking exclusive lock on the Codex root directory descriptor itself, named `root_fd`, without creating a persistent lock file. They also check each other's in-progress journals. All in-root access starts from `root_fd` and uses no-follow and `dir_fd` operations. The installer rechecks the root device and inode before critical writes, so replacing the root path cannot redirect an old transaction into the replacement directory.
 
 After backups are complete and `fsync` has made them durable, the transaction publishes a schema-versioned `journal.toml`, installs roles one by one, atomically replaces config, and persists progress. Recovery first journals deterministic object names plus input/output digests, then creates recovery objects and rechecks their identities before every rename. State moves from `install-in-progress` to `committed`; interrupted work moves through `recover-in-progress` to `recovered`, while reversal of a committed transaction moves through `restore-in-progress` to `restored`. Resume accepts only the transaction-created state or exact pre-transaction state; any third state stops to avoid overwriting concurrent changes.
 

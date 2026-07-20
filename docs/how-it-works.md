@@ -14,6 +14,8 @@
 | `install.sh` | 本机接入脚本 |
 | `codex/agents/` | 版本化 Codex 自定义角色源码 |
 | `codex/agents/managed-agents.txt` | 安装器唯一接管范围 |
+| `codex/agent-routing.toml` | 模型别名、角色默认路由、风险升档和运行时功能门禁 |
+| `scripts/codex_agent_router.py` | `PreToolUse` 路由 Hook |
 
 ## 工具文件名差异
 
@@ -61,9 +63,7 @@ ln -s AGENTS.md ./CLAUDE.md
 
 受管理角色的文件名与 TOML `name` 完全一致，并统一使用仅含小写字母、数字和下划线的名称，以便可直接作为 `spawn_agent` 的 agent name 使用。
 
-角色文件包含 `name`、精简的路由 `description`、`developer_instructions`、`nickname_candidates`、`sandbox_mode`，以及可选的 `model_reasoning_effort`。分析与评审角色默认为 `read-only`；明确实现角色默认为 `workspace-write`。父会话实时权限仍会重新施加，因此角色文件表达可审计默认值和职责边界，不是不可绕过的权限边界。
-
-`product_analyst`、`ui_ux_designer` 和 `visual_reviewer` 是边界明确的轻量只读角色，固定 `model_reasoning_effort = "medium"` 以控制延迟和消耗。架构、实现、测试、代码评审、数据一致性和最终门禁角色不固定模型或 reasoning effort，继续继承父会话，以免降低复杂任务能力或绑定单一 Provider。
+角色文件包含 `name`、精简的路由 `description`、`developer_instructions`、`nickname_candidates` 和 `sandbox_mode`，不再静态写入 `model` 或 `model_reasoning_effort`。分析与评审角色默认为 `read-only`；明确实现角色默认为 `workspace-write`。父会话实时权限仍会重新施加，因此角色文件表达可审计默认值和职责边界，不是不可绕过的权限边界。模型与 `reasoning_effort` 集中由 `agent-routing.toml` 管理，模型升级时只需更新该文件的别名映射。
 
 ## Codex 角色路由
 
@@ -87,7 +87,47 @@ ln -s AGENTS.md ./CLAUDE.md
 
 `tests/fixtures/codex_agent_routing_cases.json` 保存代表性的委派和不委派案例，用于变更角色描述或路由规则时复核角色覆盖、最大子代理数量和内置角色回退边界。
 
-安装事务以 Codex 根目录本身的目录描述符 `root_fd` 获取非阻塞独占锁，不创建持久锁文件。锁内访问从 `root_fd` 逐级使用 no-follow 和 `dir_fd` 操作，并在关键写入前复核根目录设备号和 inode；即使根路径被替换，旧事务也不会写入替代目录。
+### 角色默认 model + effort
+
+`routine` 派发使用角色默认路由。Sol、Terra、Luna 是稳定的策略层级名，具体模型标识位于 `agent-routing.toml` 的 `[models]`，不会散落在角色文件或 `AGENTS.md` 中。
+
+| 角色 | 模型层级 | `reasoning_effort` |
+|---|---|---|
+| `architect`、`data_consistency_reviewer` | Sol | `xhigh` |
+| `final_gate_reviewer` | Sol | `max` |
+| `reviewer`、`spec_plan_reviewer` | Sol | `high` |
+| `worker_backend`、`worker_frontend`、内置 `worker` / `default` | Sol | `high` |
+| `ui_ux_designer` | Sol | `medium` |
+| `test_engineer` | Terra | `high` |
+| `product_analyst`、`visual_reviewer`、内置 `explorer` | Terra | `medium` |
+
+这组默认值描述角色通常需要的能力，不代表任务风险。主 Agent 必须再根据实际影响选择路由等级：
+
+| `ROUTING_CLASS` | 行为 |
+|---|---|
+| `routine` | 使用角色默认值 |
+| `complex` | 至少提升到 Sol + `high` |
+| `critical` | 至少提升到 Sol + `xhigh`；`final_gate_reviewer` 保留 `max` |
+| `mechanical` | 仅对输入输出明确的机械任务使用 Luna + `medium` |
+
+当前运行时动态覆盖只开放 Sol 和 Terra。Luna 虽已配置为策略层级，但尚未加入 `dynamic_tiers`；`mechanical` 派发会被明确拒绝，不会静默改用 Terra。以后运行时支持 Luna 时，更新 `[models].luna` 并把 `luna` 加入 `dynamic_tiers`，无需修改角色文件。
+
+### 自动切换流程与边界
+
+主 Agent 根据任务语义和影响分级，不按“权限”“迁移”等孤立关键词猜测；例如只核对权限标签可以是 `routine`，真正修改权限契约才是 `critical`。派发消息必须包含：
+
+```text
+ROUTING_CLASS=critical
+ROUTING_REASON=修改公开权限契约并影响既有调用方
+```
+
+为兼容尚未升级的既有派发，两个标记都完全缺失时使用角色的 `routine` 默认值，并向当前任务补充 `missing-routing-markers` 提示；只写一个、重复、拼写错误或格式错误都会拒绝，不会把疑似标记静默当作默认值。
+
+`codex_agent_router.py` 在 `PreToolUse` 阶段拦截 `Agent`，读取角色默认值与风险等级，取能力更高的一组配置，并把 `model` 和 `reasoning_effort` 写回派发输入。显式覆盖要求 `fork_turns` 为 `"none"` 或正整数；完整历史 `"all"` 只能继承父 Agent，Hook 会拒绝这种组合。未受管理的 agent type 保持不变。
+
+Hook 只负责当前一次派发，不能在子 Agent 已运行后原地更换模型。子 Agent 发现范围或风险升级时返回 `ESCALATION_REQUIRED`；主 Agent停止沿用旧结果，以更高 `ROUTING_CLASS` 重新派发。这实现了可审计的自动选型和受控升档，但不替代用户批准、权限、安全、测试或评审门禁。
+
+角色安装和路由 Hook 安装都以 Codex 根目录本身的目录描述符 `root_fd` 获取非阻塞独占锁，不创建持久锁文件。两类安装器还会互相检查进行中 journal。锁内访问从 `root_fd` 逐级使用 no-follow 和 `dir_fd` 操作，并在关键写入前复核根目录设备号和 inode；即使根路径被替换，旧事务也不会写入替代目录。
 
 备份完成并 `fsync` 后，事务才发布 schema-versioned `journal.toml`，随后逐个安装角色、原子替换配置并持久化进度。恢复会先把确定性对象名和输入/输出摘要写入 journal，再创建恢复对象；每次 rename 前复核对象身份。状态从 `install-in-progress` 到 `committed`；异常事务经 `recover-in-progress` 到 `recovered`，成功事务撤销时经 `restore-in-progress` 到 `restored`。目标已经处于事务创建态或事务前态时可幂等续跑，出现第三种状态则停止，避免覆盖并发修改。
 

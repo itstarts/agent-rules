@@ -16,11 +16,17 @@ class CodexDocsAndCiContractTests(unittest.TestCase):
         self.assertIn("python3 -B scripts/validate_codex_agents.py", workflow)
         self.assertIn("python3 -B -m unittest discover -s tests -p 'test_*.py'", workflow)
 
-    def test_readmes_expose_only_the_short_install_entry(self) -> None:
+    def test_global_rules_cover_dynamic_route_fork_constraints(self) -> None:
+        rules = self.read("AGENTS.md")
+        for marker in ('fork_turns = "none"', "正整数", '"all"', "继承父 Agent"):
+            self.assertIn(marker, rules)
+
+    def test_readmes_expose_only_the_short_install_entries(self) -> None:
         for relative in ("README.md", "README.en.md"):
             with self.subTest(relative=relative):
                 content = self.read(relative)
                 self.assertIn("./install.sh codex-agents", content)
+                self.assertIn("./install.sh codex-agent-routing", content)
                 self.assertIn("docs/install", content)
                 self.assertNotIn("install-in-progress", content)
 
@@ -31,7 +37,12 @@ class CodexDocsAndCiContractTests(unittest.TestCase):
             "./install.sh codex-agents",
             "codex-agents-recover",
             "codex-agents-restore",
+            "./install.sh codex-agent-routing",
+            "codex-agent-routing-recover",
+            "codex-agent-routing-restore",
             "managed-agents.txt",
+            "PreToolUse",
+            "^Agent$",
             "max_threads = 4",
             "max_depth = 1",
             "interrupt_message = true",
@@ -71,7 +82,20 @@ class CodexDocsAndCiContractTests(unittest.TestCase):
             "worker_backend",
             "worker_frontend",
             "test_engineer",
-            "model_reasoning_effort",
+            "agent-routing.toml",
+            "codex_agent_router.py",
+            "ROUTING_CLASS",
+            "ROUTING_REASON",
+            "routine",
+            "complex",
+            "critical",
+            "mechanical",
+            "reasoning_effort",
+            "fork_turns",
+            "ESCALATION_REQUIRED",
+            "Sol",
+            "Terra",
+            "Luna",
         )
         for relative, heading in (
             ("docs/how-it-works.md", "角色路由"),
@@ -82,6 +106,23 @@ class CodexDocsAndCiContractTests(unittest.TestCase):
                 self.assertIn(heading, content)
                 for marker in shared:
                     self.assertIn(marker, content)
+
+    def test_legacy_agent_design_docs_record_the_dynamic_routing_amendment(self) -> None:
+        spec = self.read(
+            "docs/superpowers/specs/2026-07-15-versioned-codex-custom-agents-design.md"
+        )
+        plan = self.read("docs/superpowers/plans/2026-07-15-versioned-codex-custom-agents.md")
+
+        for content in (spec, plan):
+            self.assertIn("2026-07-20", content)
+            self.assertIn("agent-routing.toml", content)
+            self.assertIn("codex-agent-routing", content)
+        self.assertNotIn("只有以下边界明确的轻量只读角色固定", spec)
+        self.assertNotIn(
+            'product_analyst`、`ui_ux_designer`、`visual_reviewer` 使用 '
+            '`model_reasoning_effort = "medium"`',
+            plan,
+        )
 
 
 if __name__ == "__main__":

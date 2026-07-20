@@ -1,0 +1,77 @@
+version = 1
+
+[models]
+sol = "gpt-5.6-sol"
+terra = "gpt-5.6-terra"
+luna = "gpt-5.6-luna"
+
+[runtime]
+dynamic_tiers = ["sol", "terra"]
+
+[classes.complex]
+tier = "sol"
+effort = "high"
+
+[classes.critical]
+tier = "sol"
+effort = "xhigh"
+
+[classes.mechanical]
+tier = "luna"
+effort = "medium"
+
+[roles.architect]
+tier = "sol"
+effort = "xhigh"
+
+[roles.data_consistency_reviewer]
+tier = "sol"
+effort = "xhigh"
+
+[roles.default]
+tier = "sol"
+effort = "high"
+
+[roles.explorer]
+tier = "terra"
+effort = "medium"
+
+[roles.final_gate_reviewer]
+tier = "sol"
+effort = "max"
+
+[roles.product_analyst]
+tier = "terra"
+effort = "medium"
+
+[roles.reviewer]
+tier = "sol"
+effort = "high"
+
+[roles.spec_plan_reviewer]
+tier = "sol"
+effort = "high"
+
+[roles.test_engineer]
+tier = "terra"
+effort = "high"
+
+[roles.ui_ux_designer]
+tier = "sol"
+effort = "medium"
+
+[roles.visual_reviewer]
+tier = "terra"
+effort = "medium"
+
+[roles.worker]
+tier = "sol"
+effort = "high"
+
+[roles.worker_backend]
+tier = "sol"
+effort = "high"
+
+[roles.worker_frontend]
+tier = "sol"
+effort = "high"

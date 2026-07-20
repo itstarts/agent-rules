@@ -91,6 +91,9 @@
 
 - 仅在任务可并行、边界清晰且互不共享状态时使用 Sub Agent；单点查找直接使用搜索工具，轻量任务默认不启用 Sub Agent。
 - 多个独立任务在平台支持时一次性并发派发。不得以多 Agent 代替必要的上下文理解、验证或主 Agent 决策。
+- 创建 Sub Agent 前，主 Agent 必须依据实际任务影响而非关键词，将派发标记为 `routine`、`complex`、`critical` 或 `mechanical`，并在任务消息中记录 `ROUTING_CLASS` 和 `ROUTING_REASON`。受管理路由对 `routine` 使用角色默认配置，对 `complex` 至少使用旗舰模型与 `high`，对 `critical` 使用旗舰模型与 `xhigh`（`final_gate_reviewer` 使用 `max`），对 `mechanical` 仅在输入输出明确且运行时支持时使用低成本模型与 `low` / `medium`；具体模型标识由受管理路由配置提供，不在本规则中硬编码。
+- 受管理动态路由派发必须显式设置 `fork_turns = "none"` 或正整数字符串，以允许覆盖 model 和 reasoning effort；省略该字段或使用 `"all"` 时只能继承父 Agent 配置，不得进入动态覆盖。
+- 模型和 reasoning effort 的升档不得替代用户批准或降低权限、安全、验证和评审门禁。子 Agent 发现范围或风险高于派发等级时，应停止扩大工作并返回 `ESCALATION_REQUIRED`，由主 Agent 以更高等级重新派发；运行时不支持目标配置时不得静默降级。
 - 轻量任务默认不需要独立评审；中等任务根据影响范围、测试覆盖和共享逻辑风险决定；重量任务及项目级高风险修改在取得验证证据后至少进行一次独立评审。
 - 评审者默认使用独立 Sub Agent 或独立上下文；用户指定外部 Agent 时，后续复审沿用同一渠道。
 - 评审基于最新 diff 检查正确性、边界条件、公共契约、安全和高风险逻辑，不能替代验证。评审引发的修改需重新验证并复审至收敛；无法收敛的高风险疑点交由用户决策。

@@ -265,6 +265,10 @@ def _source_dir() -> Path:
     return _repo_root() / "codex" / "agents"
 
 
+def _routing_policy() -> Path:
+    return _repo_root() / "codex" / "agent-routing.toml"
+
+
 def _inside(path: Path, parent: Path) -> bool:
     try:
         path.relative_to(parent)
@@ -1126,6 +1130,75 @@ def _ensure_no_in_progress_transaction(root_fd: int, *, clean_staging: bool = Fa
             os.close(backups_fd)
 
 
+def _routing_journal_state(transaction_fd: int, transaction_id: str) -> str:
+    metadata = _lstat_at(transaction_fd, "journal.toml")
+    if (
+        metadata is None
+        or not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid != os.getuid()
+        or metadata.st_mode & 0o077
+    ):
+        raise InstallError("routing journal.toml must be a private current-user regular file")
+    try:
+        parsed = tomllib.loads(_read_regular_at(transaction_fd, "journal.toml").decode("utf-8"))
+    except (UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise InstallError("routing journal.toml is invalid") from exc
+    state = parsed.get("state")
+    if (
+        parsed.get("schema_version") != 1
+        or parsed.get("transaction_id") != transaction_id
+        or state
+        not in {
+            "install-in-progress",
+            "committed",
+            "recover-in-progress",
+            "recovered",
+            "restore-in-progress",
+            "restored",
+        }
+    ):
+        raise InstallError("routing journal.toml transaction or state is invalid")
+    return state
+
+
+def _ensure_no_in_progress_routing_transaction(root_fd: int) -> None:
+    if _lstat_at(root_fd, ".agent-rules-backups") is None:
+        return
+    backups_fd = namespace_fd = None
+    try:
+        backups_fd = _open_directory_at(root_fd, ".agent-rules-backups")
+        if _lstat_at(backups_fd, "codex-agent-routing") is None:
+            return
+        namespace_fd = _open_directory_at(backups_fd, "codex-agent-routing")
+        for transaction_id in sorted(os.listdir(namespace_fd)):
+            if transaction_id.startswith(".staging-") and TRANSACTION_ID_RE.fullmatch(
+                transaction_id[9:]
+            ):
+                raise InstallError("codex-agent-routing staging transaction is incomplete")
+            if not TRANSACTION_ID_RE.fullmatch(transaction_id):
+                raise InstallError("invalid entry in codex-agent-routing transaction namespace")
+            transaction_fd = _open_directory_at(namespace_fd, transaction_id)
+            try:
+                state = _routing_journal_state(transaction_fd, transaction_id)
+            finally:
+                os.close(transaction_fd)
+            if state in {"install-in-progress", "recover-in-progress", "restore-in-progress"}:
+                command = (
+                    "codex-agent-routing-restore"
+                    if state == "restore-in-progress"
+                    else "codex-agent-routing-recover"
+                )
+                raise InstallError(
+                    f"routing transaction {transaction_id} is {state}; "
+                    f"run {command} {transaction_id}"
+                )
+    finally:
+        if namespace_fd is not None:
+            os.close(namespace_fd)
+        if backups_fd is not None:
+            os.close(backups_fd)
+
+
 def _role_preflight(agents_fd: int | None, name: str, source: Path) -> dict[str, Any]:
     filename = f"{name}.toml"
     if agents_fd is None:
@@ -1278,7 +1351,7 @@ def _preflight(root_fd: int) -> dict[str, Any]:
 
 def validate_source_names() -> list[str]:
     try:
-        validate_source(_source_dir())
+        validate_source(_source_dir(), _routing_policy())
     except RoleValidationError as exc:
         raise InstallError(f"managed role source invalid:{exc}") from exc
     return [
@@ -1995,6 +2068,7 @@ def recover_or_restore(
     backups_fd = namespace_fd = transaction_fd = None
     try:
         _verify_root_identity(root, root_fd)
+        _ensure_no_in_progress_routing_transaction(root_fd)
         backups_fd, namespace_fd, transaction_fd = _existing_transaction_directories(root_fd, transaction_id)
         journal = _load_journal(transaction_fd, transaction_id)
         root_stat = os.fstat(root_fd)
@@ -2208,7 +2282,7 @@ def install(
 ) -> str | None:
     _check_platform_capabilities()
     try:
-        validate_source(_source_dir())
+        validate_source(_source_dir(), _routing_policy())
     except RoleValidationError as exc:
         raise InstallError(f"managed role source invalid:{exc}") from exc
     root, created_root, created_root_identity = _resolve_codex_root()
@@ -2217,6 +2291,7 @@ def install(
         try:
             _verify_root_identity(root, outer_fd)
             _ensure_no_in_progress_transaction(outer_fd)
+            _ensure_no_in_progress_routing_transaction(outer_fd)
             try:
                 _preflight(outer_fd)
             except ConflictError:
@@ -2242,6 +2317,7 @@ def install(
     try:
         _verify_root_identity(root, root_fd)
         _ensure_no_in_progress_transaction(root_fd, clean_staging=True)
+        _ensure_no_in_progress_routing_transaction(root_fd)
         try:
             payload = _preflight(root_fd)
         except ConflictError as initial_conflict:

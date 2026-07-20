@@ -4,6 +4,8 @@
 # 用法:
 #   ./install.sh                       # 接 Codex + Claude(默认)
 #   ./install.sh codex claude gemini   # 指定要接的工具
+#   ./install.sh codex-agents          # 显式安装 Codex 自定义角色
+#   ./install.sh codex-agent-routing   # 显式安装 Sub Agent 动态路由 Hook
 #   CLAUDE_MODE=import ./install.sh     # Claude 用 @import(保留专属补充),默认 symlink
 #
 # 本机专属补充:
@@ -20,6 +22,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 SRC="$REPO/AGENTS.md"
 CODEX_AGENTS_HELPER="$REPO/scripts/codex_agents.py"
+CODEX_AGENT_ROUTING_HELPER="$REPO/scripts/codex_agent_routing_install.py"
 CLAUDE_MODE="${CLAUDE_MODE:-symlink}"
 LOCAL_DIR="${AGENT_RULES_LOCAL:-$HOME/.agent-rules-local}"
 
@@ -54,15 +57,26 @@ if [[ "${TOOLS[0]}" == "codex-agents-recover" || "${TOOLS[0]}" == "codex-agents-
   exec python3 "$CODEX_AGENTS_HELPER" "$action" "${TOOLS[1]}"
 fi
 
+if [[ "${TOOLS[0]}" == "codex-agent-routing-recover" ||
+      "${TOOLS[0]}" == "codex-agent-routing-restore" ]]; then
+  if [[ ${#TOOLS[@]} -ne 2 || ! "${TOOLS[1]}" =~ ^[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}$ ]]; then
+    echo "✗ ${TOOLS[0]} 必须独占命令行并接收一个合法 transaction ID" >&2
+    exit 2
+  fi
+  action="${TOOLS[0]#codex-agent-routing-}"
+  require_codex_agents_python
+  exec python3 "$CODEX_AGENT_ROUTING_HELPER" "$action" "${TOOLS[1]}"
+fi
+
 for t in "${TOOLS[@]}"; do
   case "$t" in
-    codex|claude|gemini|codex-agents) ;;
-    codex-agents-recover|codex-agents-restore)
+    codex|claude|gemini|codex-agents|codex-agent-routing) ;;
+    codex-agents-recover|codex-agents-restore|codex-agent-routing-recover|codex-agent-routing-restore)
       echo "✗ $t 必须独占命令行并接收一个 transaction ID" >&2
       exit 2
       ;;
     *)
-      echo "✗ 未知工具名:$t(支持 codex / claude / gemini / codex-agents)" >&2
+      echo "✗ 未知工具名:$t(支持 codex / claude / gemini / codex-agents / codex-agent-routing)" >&2
       exit 2
       ;;
   esac
@@ -172,6 +186,9 @@ install_concat_tool() {
 install_codex()  { install_concat_tool codex  "$HOME/.codex/AGENTS.md"; }
 install_gemini() { install_concat_tool gemini "$HOME/.gemini/GEMINI.md"; }
 install_codex_agents() { require_codex_agents_python && python3 "$CODEX_AGENTS_HELPER" install; }
+install_codex_agent_routing() {
+  require_codex_agents_python && python3 "$CODEX_AGENT_ROUTING_HELPER" install
+}
 
 # Claude 支持 import:symlink 模式或 import 模式
 install_claude() {
@@ -203,6 +220,7 @@ for t in "${TOOLS[@]}"; do
     claude) install_claude ;;
     gemini) install_gemini ;;
     codex-agents) install_codex_agents ;;
+    codex-agent-routing) install_codex_agent_routing ;;
   esac
 done
 echo

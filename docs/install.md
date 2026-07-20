@@ -53,7 +53,7 @@ max_depth = 1
 interrupt_message = true
 ```
 
-全局 `config.toml` 中的模型、Provider、认证、MCP、插件、`job_max_runtime_seconds`、角色子表及其它配置保持不动；角色文件自身的轻量 `model_reasoning_effort` 策略见 [工作原理](how-it-works.md#codex-角色路由)。显式 `multi_agent = false` 或不兼容结构会安全停止。配置不存在时以 `0600` 创建；现有配置通过 `tomllib` 完整解析，只补缺失兼容键，并从同一 Codex 根文件系统内的事务 staging 原子替换。
+`codex-agents` 不管理全局 `config.toml` 中的模型、Provider、认证、MCP、插件、`job_max_runtime_seconds`、角色子表及其它配置；动态模型与 effort 由下文独立的路由入口管理。显式 `multi_agent = false` 或不兼容结构会安全停止。配置不存在时以 `0600` 创建；现有配置通过 `tomllib` 完整解析，只补缺失兼容键，并从同一 Codex 根文件系统内的事务 staging 原子替换。
 
 每次发生实际变更都会输出 transaction ID，格式为 UTC 时间戳和随机后缀。角色旧文件、损坏软链元数据和配置备份保存在 Codex 根目录下的受保护事务目录；目录权限不宽于 `0700`，普通备份和 `journal.toml` 不宽于 `0600`。事务先持久化备份与 journal，再修改目标。
 
@@ -81,7 +81,42 @@ python3 -B scripts/validate_codex_agents.py --installed-root "${CODEX_HOME:-$HOM
 codex --strict-config doctor --json
 ```
 
-受管理角色使用逐文件软链，仓库更新后内容会自动同步，不需要重复安装。为确保客户端重新读取角色描述、路由和 reasoning effort，更新角色源码后建议新开 Codex 任务。
+受管理角色使用逐文件软链，仓库更新后内容会自动同步，不需要重复安装。为确保客户端重新读取角色描述，更新角色源码后建议新开 Codex 任务。
+
+## Codex 子代理动态路由
+
+路由 Hook 是另一个显式入口，不包含在默认安装、`codex` 或 `codex-agents` 目标中：
+
+```bash
+./install.sh codex-agent-routing
+```
+
+该入口同样要求 Python 3.11+，不安装依赖。它在 Codex 根目录的 `config.toml` 中增加一个带专用起止标记的 inline Hook；匹配范围只有 `PreToolUse` 的 `^Agent$`。Codex 的工具别名覆盖会让该 matcher 同时捕获 canonical `spawn_agent`，router 接受这两个 `tool_name`。Hook 命令按绝对路径引用仓库内的 `scripts/codex_agent_router.py`，后者读取 `codex/agent-routing.toml`，因此同一 clone 内更新模型标识或路由表后无需重装。移动 clone、切换 Python 可执行文件或变更安装块格式后，应重跑安装器。
+
+安装器不绕过 Codex 的 Hook trust 机制。首次加载非托管 command Hook 时，Codex 可能要求用户检查并信任绝对命令路径；应确认路径指向当前 clone 后再批准。
+
+安装器只接管专用标记内的 Hook 块，并保留其它合法配置和不匹配 `Agent` 的 Hooks。以下情况会在创建事务前安全停止：
+
+- `[features] hooks = false` 或弃用别名 `codex_hooks = false`；
+- 同层已存在 `hooks.json`，避免同时加载两种 Hook 配置并产生告警；
+- 已存在另一个能匹配 `Agent` 或 canonical `spawn_agent` 的 `PreToolUse` Hook；
+- 专用标记缺失一端、重复，或标记内结构被改坏。
+
+路由 Hook 会改写派发输入中的 `model` 和 `reasoning_effort`，保留其它字段。显式覆盖要求 `fork_turns = "none"` 或正整数形式的有限历史；省略 `fork_turns` 或使用 `"all"` 时，运行时只能继承父 Agent，因此 Hook 会拒绝该次派发。未受管理的第三方 agent type 不会被改写。
+
+实际变更使用独立事务命名空间，并与 `codex-agents` 共用 Codex 根目录锁；任一安装器存在进行中事务时，另一个安装器都会停止。异常中断后执行：
+
+```bash
+./install.sh codex-agent-routing-recover 20260715T120000Z-a1b2c3d4e5f6
+```
+
+撤销已提交的路由安装执行：
+
+```bash
+./install.sh codex-agent-routing-restore 20260715T120000Z-a1b2c3d4e5f6
+```
+
+恢复和撤销只替换或移除专用标记块，并保留安装后新增的其它合法 `config.toml` 内容；若该托管块已被外部修改，则拒绝覆盖。路由配置、风险等级和 Luna 功能门禁见 [工作原理](how-it-works.md#codex-角色路由)。
 
 ## 目标文件与既有配置
 

@@ -14,10 +14,22 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 VALIDATOR = REPO / "scripts" / "validate_codex_agents.py"
 ROUTING_CASES = REPO / "tests" / "fixtures" / "codex_agent_routing_cases.json"
-LIGHTWEIGHT_EFFORT_ROLES = {
-    "product_analyst",
-    "ui_ux_designer",
-    "visual_reviewer",
+ROUTING_POLICY = REPO / "codex" / "agent-routing.toml"
+EXPECTED_ROUTES = {
+    "architect": ("sol", "xhigh"),
+    "data_consistency_reviewer": ("sol", "xhigh"),
+    "default": ("sol", "high"),
+    "explorer": ("terra", "medium"),
+    "final_gate_reviewer": ("sol", "max"),
+    "product_analyst": ("terra", "medium"),
+    "reviewer": ("sol", "high"),
+    "spec_plan_reviewer": ("sol", "high"),
+    "test_engineer": ("terra", "high"),
+    "ui_ux_designer": ("sol", "medium"),
+    "visual_reviewer": ("terra", "medium"),
+    "worker": ("sol", "high"),
+    "worker_backend": ("sol", "high"),
+    "worker_frontend": ("sol", "high"),
 }
 
 
@@ -72,18 +84,22 @@ class RepositoryRoleValidationTests(unittest.TestCase):
 
         self.assertLessEqual(sum(map(len, descriptions)), 1100)
 
-    def test_reasoning_effort_is_scoped_to_lightweight_read_only_roles(self) -> None:
+    def test_managed_roles_delegate_model_and_effort_to_routing_policy(self) -> None:
         source = REPO / "codex" / "agents"
         names = (source / "managed-agents.txt").read_text(encoding="utf-8").splitlines()
+        policy = tomllib.loads(ROUTING_POLICY.read_text(encoding="utf-8"))
 
         for name in names:
             role = tomllib.loads((source / f"{name}.toml").read_text(encoding="utf-8"))
             with self.subTest(name=name):
-                if name in LIGHTWEIGHT_EFFORT_ROLES:
-                    self.assertEqual("medium", role.get("model_reasoning_effort"))
-                    self.assertEqual("read-only", role["sandbox_mode"])
-                else:
-                    self.assertNotIn("model_reasoning_effort", role)
+                self.assertNotIn("model", role)
+                self.assertNotIn("model_reasoning_effort", role)
+
+        self.assertEqual(set(EXPECTED_ROUTES), set(policy["roles"]))
+        for name, (tier, effort) in EXPECTED_ROUTES.items():
+            with self.subTest(route=name):
+                self.assertEqual(tier, policy["roles"][name]["tier"])
+                self.assertEqual(effort, policy["roles"][name]["effort"])
 
     def test_final_gate_requires_only_applicable_evidence(self) -> None:
         role = tomllib.loads(
@@ -111,7 +127,16 @@ class RepositoryRoleValidationTests(unittest.TestCase):
         for case in cases:
             with self.subTest(case=case["id"]):
                 self.assertEqual(
-                    {"id", "prompt", "should_delegate", "expected_roles", "max_children", "reason"},
+                    {
+                        "id",
+                        "prompt",
+                        "should_delegate",
+                        "expected_roles",
+                        "expected_routes",
+                        "max_children",
+                        "reason",
+                        "routing_class",
+                    },
                     set(case),
                 )
                 self.assertIsInstance(case["prompt"], str)
@@ -121,6 +146,7 @@ class RepositoryRoleValidationTests(unittest.TestCase):
                 self.assertIs(type(case["should_delegate"]), bool)
                 self.assertIs(type(case["max_children"]), int)
                 self.assertIsInstance(case["expected_roles"], list)
+                self.assertIsInstance(case["expected_routes"], dict)
                 self.assertLessEqual(case["max_children"], 4)
                 self.assertGreaterEqual(case["max_children"], 0)
                 self.assertTrue(set(case["expected_roles"]).issubset(allowed_roles))
@@ -129,9 +155,17 @@ class RepositoryRoleValidationTests(unittest.TestCase):
                 if case["should_delegate"]:
                     self.assertTrue(case["expected_roles"])
                     self.assertGreater(case["max_children"], 0)
+                    self.assertIn(case["routing_class"], {"routine", "complex", "critical", "mechanical"})
+                    self.assertEqual(set(case["expected_roles"]), set(case["expected_routes"]))
+                    for route in case["expected_routes"].values():
+                        self.assertEqual({"model", "reasoning_effort"}, set(route))
+                        self.assertIsInstance(route["model"], str)
+                        self.assertIsInstance(route["reasoning_effort"], str)
                 else:
                     self.assertEqual([], case["expected_roles"])
                     self.assertEqual(0, case["max_children"])
+                    self.assertIsNone(case["routing_class"])
+                    self.assertEqual({}, case["expected_routes"])
                 covered_roles.update(case["expected_roles"])
                 cases_by_id[case["id"]] = case
 
@@ -175,7 +209,7 @@ class RepositoryRoleValidationTests(unittest.TestCase):
                 self.assertIn("architect.toml", result.stderr)
                 self.assertNotIn("只产出架构方案", result.stderr)
 
-    def test_validator_accepts_index_declared_role_and_optional_effort(self) -> None:
+    def test_validator_rejects_index_declared_role_without_routing_entry(self) -> None:
         source = REPO / "codex" / "agents"
         with tempfile.TemporaryDirectory() as tmp:
             copied = Path(tmp) / "agents"
@@ -183,7 +217,6 @@ class RepositoryRoleValidationTests(unittest.TestCase):
             probe = (copied / "architect.toml").read_text(encoding="utf-8")
             probe = probe.replace('name = "architect"', 'name = "architecture_probe"')
             probe = probe.replace('["Keystone", "Lattice"]', '["Arch Probe"]')
-            probe += '\nmodel_reasoning_effort = "medium"\n'
             (copied / "architecture_probe.toml").write_text(probe, encoding="utf-8")
             names = (copied / "managed-agents.txt").read_text(encoding="utf-8").splitlines()
             names.append("architecture_probe")
@@ -191,8 +224,64 @@ class RepositoryRoleValidationTests(unittest.TestCase):
 
             result = self.run_validator(copied)
 
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("routing-policy: role-set-mismatch", result.stderr)
+
+    def test_validator_accepts_index_declared_role_with_routing_entry(self) -> None:
+        source = REPO / "codex" / "agents"
+        with tempfile.TemporaryDirectory() as tmp:
+            copied = Path(tmp) / "agents"
+            shutil.copytree(source, copied)
+            probe = (copied / "architect.toml").read_text(encoding="utf-8")
+            probe = probe.replace('name = "architect"', 'name = "architecture_probe"')
+            probe = probe.replace('["Keystone", "Lattice"]', '["Arch Probe"]')
+            (copied / "architecture_probe.toml").write_text(probe, encoding="utf-8")
+            names = (copied / "managed-agents.txt").read_text(encoding="utf-8").splitlines()
+            names.append("architecture_probe")
+            (copied / "managed-agents.txt").write_text("\n".join(sorted(names)) + "\n", encoding="utf-8")
+            policy = Path(tmp) / "agent-routing.toml"
+            policy.write_text(
+                ROUTING_POLICY.read_text(encoding="utf-8")
+                + '\n[roles.architecture_probe]\ntier = "sol"\neffort = "xhigh"\n',
+                encoding="utf-8",
+            )
+
+            result = self.run_validator(copied, "--routing-policy", str(policy))
+
             self.assertEqual(0, result.returncode, result.stderr)
             self.assertEqual("12 managed Codex agents validated\n", result.stdout)
+
+    def test_invalid_routing_policies_are_rejected(self) -> None:
+        source = REPO / "codex" / "agents"
+        original = ROUTING_POLICY.read_text(encoding="utf-8")
+        cases = {
+            "unknown-role": original + '\n[roles.stale_role]\ntier = "terra"\neffort = "medium"\n',
+            "unknown-top-level": original.replace(
+                "version = 1\n",
+                "version = 1\nunknown = true\n",
+            ),
+            "boolean-version": original.replace("version = 1", "version = true"),
+            "unknown-runtime-key": original.replace(
+                'dynamic_tiers = ["sol", "terra"]',
+                'dynamic_tiers = ["sol", "terra"]\nunknown = true',
+            ),
+            "non-string-dynamic-tier": original.replace(
+                'dynamic_tiers = ["sol", "terra"]',
+                "dynamic_tiers = [{}]",
+            ),
+            "invalid-tier": original.replace('tier = "terra"', 'tier = "sun"', 1),
+            "invalid-effort": original.replace('effort = "medium"', 'effort = "turbo"', 1),
+            "empty-model": original.replace('sol = "gpt-5.6-sol"', 'sol = ""'),
+        }
+        for expected, content in cases.items():
+            with self.subTest(expected=expected), tempfile.TemporaryDirectory() as tmp:
+                policy = Path(tmp) / "agent-routing.toml"
+                policy.write_text(content, encoding="utf-8")
+
+                result = self.run_validator(source, "--routing-policy", str(policy))
+
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("routing-policy:", result.stderr)
 
     def test_validator_rejects_total_description_budget_overflow(self) -> None:
         source = REPO / "codex" / "agents"
