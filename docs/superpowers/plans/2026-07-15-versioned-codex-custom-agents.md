@@ -3,6 +3,7 @@
 > 状态：已完成，作为历史实施记录保留
 > 初始计划批准：2026-07-15
 > 效率修订批准：2026-07-18
+> 动态路由修订批准：2026-07-20
 > 依据：`docs/superpowers/specs/2026-07-15-versioned-codex-custom-agents-design.md`
 > 压缩说明：本文件由实施计划整理为完成记录；原始逐步 TDD 清单、47 个未勾选计划项和八轮详细评审流水可从 Git 历史中的 `adf69d5` 查看。
 
@@ -15,6 +16,8 @@
 - `install.sh` 继续承担顶层命令分派；
 - `scripts/codex_agents.py` 使用 Python 3.11+ 标准库实现配置合并、锁、备份、journal、安装、recover 和 restore；
 - `scripts/validate_codex_agents.py` 校验角色源码和安装目标；
+- `codex/agent-routing.toml` 集中管理 model + effort，`scripts/codex_agent_router.py` 执行 Hook 路由；
+- `scripts/codex_agent_routing_install.py` 提供独立的 `codex-agent-routing` 安装与恢复事务；
 - `tests/` 使用临时 `HOME` / `CODEX_HOME` 和 Unix 故障注入；
 - `codex/agents/` 是角色源码和接管索引的唯一来源；
 - 安装采用逐文件绝对软链。
@@ -25,7 +28,7 @@
 - `config.toml` 中除三个受管理键外的内容；
 - 未管理角色和历史备份；
 - 默认无参数、`codex`、`claude`、`gemini` 安装行为；
-- 公共模型、Provider、认证、MCP、插件和 Skill 配置；
+- 主会话全局默认模型、Provider、认证、MCP、插件和 Skill 配置；
 - 自动发布、部署、tag 或 release。
 
 ## 2. 完成的文件范围
@@ -39,11 +42,15 @@
 
 - `install.sh`
 - `scripts/codex_agents.py`
+- `scripts/codex_agent_router.py`
+- `scripts/codex_agent_routing_install.py`
 - `scripts/validate_codex_agents.py`
 
 ### 2.3 测试
 
 - `tests/test_codex_agent_roles.py`
+- `tests/test_codex_agent_router.py`
+- `tests/test_codex_agent_routing_install.py`
 - `tests/test_codex_agents_dispatch.py`
 - `tests/test_codex_config_merge.py`
 - `tests/test_codex_agents_install.py`
@@ -90,9 +97,9 @@
 - `managed-agents.txt` 是受管理集合单源；
 - description 只保留路由信息，公共操作限制放入 instructions；
 - 单个 description 最多 120 字符，总量最多 1100 字符；
-- `product_analyst`、`ui_ux_designer`、`visual_reviewer` 使用 `model_reasoning_effort = "medium"`；
-- 其它角色继承父会话模型和 reasoning effort；
-- 16 个路由案例覆盖全部自定义角色、内置回退、不委派和并行边界。
+- 所有受管理角色不静态写入 `model` 或 `model_reasoning_effort`；
+- `agent-routing.toml` 覆盖全部索引角色与内置 `default` / `explorer` / `worker`，集中管理角色默认路由和风险升档；
+- 19 个路由案例覆盖全部自定义角色、内置回退、风险升档、Luna 门禁、不委派和并行边界。
 
 ### 4.2 安装与配置
 

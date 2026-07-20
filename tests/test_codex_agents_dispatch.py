@@ -47,6 +47,17 @@ class InstallerDispatchTests(unittest.TestCase):
             self.assertFalse((home / ".codex" / "agents").exists())
             self.assertFalse((home / ".codex" / "config.toml").exists())
 
+    def test_codex_agent_routing_is_an_explicit_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            result = self.run_installer(home, "codex-agent-routing")
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            config = (home / ".codex" / "config.toml").read_text(encoding="utf-8")
+            self.assertIn("agent-rules:codex-agent-routing:begin", config)
+            self.assertIn('matcher = "^Agent$"', config)
+            self.assertFalse((home / ".codex" / "agents").exists())
+
     def test_invalid_target_is_rejected_before_any_installation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
@@ -62,6 +73,13 @@ class InstallerDispatchTests(unittest.TestCase):
                 ("codex-agents-recover",),
                 ("codex-agents-recover", "invalid"),
                 ("codex-agents-restore", "20260715T120000Z-a1b2c3d4e5f6", "extra"),
+                ("codex-agent-routing-recover",),
+                ("codex-agent-routing-recover", "invalid"),
+                (
+                    "codex-agent-routing-restore",
+                    "20260715T120000Z-a1b2c3d4e5f6",
+                    "extra",
+                ),
             ):
                 with self.subTest(args=args):
                     result = self.run_installer(home, *args)
@@ -75,6 +93,19 @@ class InstallerDispatchTests(unittest.TestCase):
                 home,
                 "codex",
                 "codex-agents-recover",
+                "20260715T120000Z-a1b2c3d4e5f6",
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertFalse((home / ".codex").exists())
+
+    def test_routing_recovery_command_cannot_mix_with_install_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            result = self.run_installer(
+                home,
+                "codex",
+                "codex-agent-routing-recover",
                 "20260715T120000Z-a1b2c3d4e5f6",
             )
 
@@ -102,6 +133,14 @@ class InstallerDispatchTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
             )
+            routing = subprocess.run(
+                [str(INSTALLER), "codex-agent-routing"],
+                cwd=REPO,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
             codex = subprocess.run(
                 [str(INSTALLER), "codex"],
                 cwd=REPO,
@@ -113,6 +152,8 @@ class InstallerDispatchTests(unittest.TestCase):
 
             self.assertNotEqual(0, agents.returncode)
             self.assertIn("Python 3.11", agents.stderr)
+            self.assertNotEqual(0, routing.returncode)
+            self.assertIn("Python 3.11", routing.stderr)
             self.assertEqual(0, codex.returncode, codex.stderr)
 
 

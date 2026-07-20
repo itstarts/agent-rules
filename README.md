@@ -14,6 +14,7 @@ cd ~/agent-rules
 ./install.sh                      # 默认接入 Codex + Claude Code
 ./install.sh codex claude gemini  # 可选接入 Gemini CLI
 ./install.sh codex-agents         # 显式安装 Codex 全局自定义角色
+./install.sh codex-agent-routing  # 显式安装子代理 model + effort 路由 Hook
 ```
 
 安装后会接入这些位置：
@@ -24,12 +25,13 @@ cd ~/agent-rules
 | Claude Code | `~/.claude/CLAUDE.md` |
 | Gemini CLI | `~/.gemini/GEMINI.md` |
 | Codex custom agents | `${CODEX_HOME:-~/.codex}/agents/*.toml` |
+| Codex agent routing Hook | `${CODEX_HOME:-~/.codex}/config.toml` |
 
 安装脚本会优先使用软链或 Claude import，让规则随仓库更新同步。**请保留 clone 目录，不要移动或删除**；软链 / import 模式按绝对路径引用本仓库，目录移动后全局配置会失效。
 
 已有目标文件时，脚本会按目标类型处理：真实文件会备份为 `*.bak.<timestamp>.<pid>`；指向本仓库源的软链会跳过；部分生成模式会先移除旧软链再写入新文件。完整行为见 [安装细节](docs/install.md)。
 
-`codex-agents` 是独立、显式入口，不会改变无参数或 `codex` 目标的既有行为。它安装 11 个版本化角色并保守补齐 `[agents]` 三个治理键；事务、冲突和恢复命令见 [安装细节](docs/install.md#codex-全局自定义角色)，角色路由和轻量 effort 策略见 [工作原理](docs/how-it-works.md#codex-角色路由)。
+`codex-agents` 和 `codex-agent-routing` 都是独立、显式入口，不会改变无参数或 `codex` 目标的既有行为。前者安装 11 个版本化角色并保守补齐 `[agents]` 三个治理键；后者安装 `PreToolUse` Hook，在派发 Sub Agent 时按受管理策略写入 `model + reasoning_effort`。事务、冲突和恢复命令见 [安装细节](docs/install.md)，角色与风险分级见 [工作原理](docs/how-it-works.md#codex-角色路由)。
 
 ## 常见用法
 
@@ -56,7 +58,7 @@ ln -s AGENTS.md ./CLAUDE.md
 | [AGENTS.md](AGENTS.md) | 全局工程规则源 |
 | [project-template.md](project-template.md) | 项目级规则模板 |
 | [docs/install.md](docs/install.md) | 安装、迁移、恢复和本机补充 |
-| [docs/how-it-works.md](docs/how-it-works.md) | 文件职责、同步方式、角色路由和轻量 effort 策略 |
+| [docs/how-it-works.md](docs/how-it-works.md) | 文件职责、同步方式、角色路由和动态 model + effort 策略 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献规则 |
 | [SECURITY.md](SECURITY.md) | 安全问题报告 |
 

@@ -14,6 +14,7 @@ cd ~/agent-rules
 ./install.sh                      # defaults to Codex + Claude Code
 ./install.sh codex claude gemini  # optionally wire up Gemini CLI
 ./install.sh codex-agents         # explicitly install global Codex custom agents
+./install.sh codex-agent-routing  # explicitly install model + effort routing
 ```
 
 The installer wires these targets:
@@ -24,12 +25,13 @@ The installer wires these targets:
 | Claude Code | `~/.claude/CLAUDE.md` |
 | Gemini CLI | `~/.gemini/GEMINI.md` |
 | Codex custom agents | `${CODEX_HOME:-~/.codex}/agents/*.toml` |
+| Codex agent routing Hook | `${CODEX_HOME:-~/.codex}/config.toml` |
 
 The installer prefers symlinks or Claude imports so rules stay in sync with this repository. **Keep the clone directory in place; do not move or delete it.** Symlink/import modes reference this checkout by absolute path, so moving the directory breaks the global config.
 
 Existing targets are handled by type: real files are backed up as `*.bak.<timestamp>.<pid>`; symlinks already pointing at this repository are skipped; some generated-file modes remove an old symlink before writing a new file. See [installation details](docs/install.en.md) for the exact behavior.
 
-`codex-agents` is a separate explicit target, so it does not change the existing no-argument or `codex` behavior. It installs 11 versioned roles and conservatively adds three `[agents]` governance keys. See [installation details](docs/install.en.md#global-codex-custom-agents) for transactions, conflicts, and recovery commands, and [how it works](docs/how-it-works.en.md#codex-role-routing) for role routing and the lightweight effort policy.
+`codex-agents` and `codex-agent-routing` are separate explicit targets, so neither changes the existing no-argument or `codex` behavior. The first installs 11 versioned roles and conservatively adds three `[agents]` governance keys. The second installs a `PreToolUse` Hook that writes `model + reasoning_effort` when a Sub Agent is dispatched. See [installation details](docs/install.en.md) for transactions, conflicts, and recovery commands, and [how it works](docs/how-it-works.en.md#codex-role-routing) for role and risk classification.
 
 ## Common Usage
 
@@ -56,7 +58,7 @@ Project-level rules override and refine global rules. See [project-template.md](
 | [AGENTS.md](AGENTS.md) | Global engineering rule source |
 | [project-template.md](project-template.md) | Project-level rule template |
 | [docs/install.en.md](docs/install.en.md) | Install, migration, restore, and per-machine extras |
-| [docs/how-it-works.en.md](docs/how-it-works.en.md) | File responsibilities, sync modes, role routing, and lightweight effort policy |
+| [docs/how-it-works.en.md](docs/how-it-works.en.md) | File responsibilities, sync modes, role routing, and dynamic model + effort policy |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 | [SECURITY.md](SECURITY.md) | Security reporting |
 
